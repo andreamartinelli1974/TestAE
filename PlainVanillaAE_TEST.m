@@ -139,8 +139,8 @@ AutoEncoder.parametersSpotCheck;
 
 AutoEncoder.SetNet;
 
-features = AutoEncoder.EncDecWdelays_f(TrainigSet,'encode');
-x_pred = AutoEncoder.EncDecWdelays_f(features,'decode');
+features = AutoEncoder.EncDecFunction(TrainigSet,'encode');
+x_pred = AutoEncoder.EncDecFunction(features,'decode');
 
 highestDelay = InputParams.Delays(end); 
 
@@ -154,8 +154,8 @@ AutoEncoder2.parametersSpotCheck;
 
 AutoEncoder2.SetNet;
 
-features2 = AutoEncoder2.EncDecWdelays_f(TrainigSet,'encode');
-x_pred2 = AutoEncoder2.EncDecWdelays_f(features,'decode');
+features2 = AutoEncoder2.EncDecFunction(TrainigSet,'encode');
+x_pred2 = AutoEncoder2.EncDecFunction(features,'decode');
 
 %%
 close all

@@ -260,7 +260,6 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
             
             while t<L
                 
-                nowAE = tic;
                 % constraints: these params can be modified during
                 % repricing (e.g. because a single asset is no more or has
                 % entered the investable universe or because of quantsignals feedbacks through checkSignals - see below -)
@@ -547,19 +546,23 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                     
                     % ***** COPULA SIMULATIONS AND TAIL MODELING MGMT *****
                     if DAA_params.copula_sim == 1 & ~BackTestOnly
-                        
+                        nowAE = tic
                         % Dataset used for multivariate distribution
                         % modeling and simulation / projection purposes
                         if DAA_params.UseAutoEncoder == false
                             DataSet4Modeling = X;
                         else
-                            
-                            AutoEncoder.parametersSpotCheck;
-                            
-                            AutoEncoder.SetNet;
-                            
-                            TrainigSet = X';
-                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainigSet,'encode');
+                            % AEparams.HiddenSize = 60;
+                            % AEparams.EncoderTransferFunction = 'logsig';
+                            % AEparams.DecoderTransferFunction = 'purelin';
+                            % AEparams.L2WeightRegularization = 0.000;
+                            % AEparams.SparsityRegularization = 0.5;
+                            % AEparams.SparsityProportion = 0.05;
+                            % AEparams.MaxEpoch = 2500;
+                            % AEparams.ScaleData = true;
+
+                            AutoEncoder.Encode(TrainigSet);
+                            DataSet4Modeling = AutoEncoder.CodedSet';
                         end
                             % *********************************************************
                         % modelling invariants based on a semiparametric approach
@@ -676,7 +679,18 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         debug_OUT.TAILS = {HistLD HistUD SimLD SimUD DiffLD DiffUD};
                         
                         if DAA_params.UseAutoEncoder == true
-                            X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode');
+                            AutoEncoder.Decode(X_simulated');
+                            X_simulated = AutoEncoder.SimulatedSet';
+                        end
+                        
+                        runningtime = toc(nowAE)
+                        
+                        if DAA_params.UseAutoEncoder == true
+                            U.Debug.AE.WITH.X_simulated{counterAE} = X_simulated;
+                            U.Debug.AE.WITH.runningtime{counterAE} = runningtime;
+                        else
+                            U.Debug.AE.WITHOUT.X_simulated{counterAE} = X_simulated;
+                            U.Debug.AE.WITHOUT.runningtime{counterAE} = runningtime;
                         end
                         
                         % ***** END OF TAILS CODEPENDENNCE MONITORING *****
@@ -872,15 +886,6 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         if first==0
                             Allocation_changes_EP(t) = 1;
                         end
-                    end
-                    runningtime = toc(nowAE)
-                    
-                    if DAA_params.UseAutoEncoder == true
-                        U.Debug.AE.WITH.X_simulated{counterAE} = X_simulated;
-                        U.Debug.AE.WITH.runningtime{counterAE} = runningtime;
-                    else
-                        U.Debug.AE.WITHOUT.X_simulated{counterAE} = X_simulated;
-                        U.Debug.AE.WITHOUT.runningtime{counterAE} = runningtime;
                     end
                     
                     if DAA_params.UseAutoEncoder == true
