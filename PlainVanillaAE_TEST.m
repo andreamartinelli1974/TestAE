@@ -70,7 +70,7 @@ IU.ticker{31,1} = ['TOP40 Index'];
 IU.ticker{32,1} = ['DAX Index']; 
 IU.ticker{33,1} = ['FTSEMIB Index']; 
 IU.ticker{34,1} = ['NDX Index']; 
-
+IU.ticker{35,1} = ['ITRX XOVER CDSI GEN 5Y Corp']; 
 
 
 N = numel(IU.ticker(:,1)); % # assets
@@ -117,7 +117,7 @@ Invariants.names = IU.ticker(:,1);
 
 TrainigSet = Invariants.data'; % U2.Output.CleanPrices(:,2:end)'; %
 
-InputParams.HiddenSize = 4;
+InputParams.HiddenSize = 5;
 InputParams.N_myFactors = 8; % number of real factors to be modelled (must be the first n of the data set)
 InputParams.EncoderTransferFunction = 'logsig'; %  'radbas'; %
 InputParams.DecoderTransferFunction = 'purelin';
@@ -128,7 +128,7 @@ InputParams.divideMode = 'time'; % 'sample';
 InputParams.divideParam.trainRatio = 70/100;
 InputParams.divideParam.valRatio = 15/100;
 InputParams.divideParam.testRatio = 15/100;
-InputParams.Delays = [0 1 5 25];
+InputParams.Delays = [0 1 2 10];
 InputParams.LossFcn = 'mse'; % 'msesparse'; % Loss function used to train the net 
 InputParams.trainFcn = 'trainlm'; % use with mse
 % InputParams.trainFcn = 'trainscg'; % use with msesparse
@@ -157,9 +157,11 @@ AutoEncoder2.SetNet;
 features2 = AutoEncoder2.EncDecWdelays_f(TrainigSet,'encode');
 x_pred2 = AutoEncoder2.EncDecWdelays_f(features,'decode');
 
+%%
+close all
 
-
-figure;
+% data plot
+figure('Name','With Delay');
 subplot(3,3,1);
 for k=1:InputParams.N_myFactors
     subplot(3,3,k);
@@ -169,7 +171,18 @@ for k=1:InputParams.N_myFactors
     plot(x_pred(k,:),'g')
 end
 
-figure;
+% cumulated returns (using exp() since log returns have been modeled)
+figure('Name','With Delay');
+subplot(3,3,1);
+for k=1:InputParams.N_myFactors
+    subplot(3,3,k);
+    plot(exp(cumsum(TrainigSet(k,highestDelay:end))),'b')
+    hold on
+    grid on
+    plot(exp(cumsum(x_pred(k,:))),'g')
+end
+
+figure('Name','Without Delay');
 subplot(3,3,1);
 for k=1:InputParams.N_myFactors
     subplot(3,3,k);
@@ -178,3 +191,15 @@ for k=1:InputParams.N_myFactors
     grid on
     plot(x_pred2(k,:),'g')
 end
+
+figure('Name','Without Delay');
+subplot(3,3,1);
+for k=1:InputParams.N_myFactors
+    subplot(3,3,k);
+    plot(exp(cumsum(TrainigSet(k,:))),'b')
+    hold on
+    grid on
+    plot(exp(cumsum(x_pred(k,:))),'g')
+end
+
+
