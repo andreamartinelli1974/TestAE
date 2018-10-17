@@ -1,0 +1,423 @@
+classdef IR_Curve < handle
+   % Instances of this class gather historical data for a given zero curve
+   % (e.g. YCGT0040 Index)
+    
+   %  TODO: add a property to this and similar classes (e.g. CDS_Curve)
+   %  indicating the fromat of data (e.g. if rates are percentages, bps or
+   %  fractions)
+   
+    properties
+        Curve = []; % main output
+    end
+    
+    properties (Constant)
+        % the default format for rates in this class is 'fraction' (e.g. 0.02 for 2%)
+        % if the input format is different then it will be converted into
+        % 'fraction' format
+        RatesFormat = 'f'; 
+        
+        % mapping curve tenors (from Bloomberg) to year fraction terms
+        % there are several TenorsKeySet / TenorsValueSet pairs since they
+        % need to reflect how BBG tickers are built. For example
+        % TenorsKeySet_1 / TenorsValueSet_1 reflect the most common
+        % structure used for Bloomberg's Fair Mkt Curve rates, while 
+        % TenorsKeySet_2 / TenorsValueSet_2 reflects what happens with
+        % asset spreas rates (e.g. ILSS, USSP, etc.)
+        % The pair to be used is defined through the unput parameter
+        % .TenorsKeyMapping_choice
+        
+        TenorsKeySet_1 =  {'1D','1W','1M','2M','3M', '6M', '1Y', '18M', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', ...
+            '8Y', '9Y', '10Y', '11Y','12M', '15Y', '20Y', '25Y', '30Y','35Y','40Y','45Y','50Y'};
+        TenorsValueSet_1 = [1/365 7/365 30/360 60/360 0.25 0.50 1 1.5 2 3 4 5 6 7 8 9 10 11 12 15 20 25 30 35 40 45 50];
+        
+%         TenorsKeySet_1 =  {'3M', '6M', '1Y', '18M', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', ...
+%             '8Y', '9Y', '10Y', '11Y','12M', '15Y', '20Y', '25Y', '30Y','35Y','40Y','45Y','50Y'};
+%         TenorsValueSet_1 = [0.25 0.50 1 1.5 2 3 4 5 6 7 8 9 10 11 12 15 20 25 30 35 40 45 50];
+        
+        TenorsKeySet_2 =  {'2', '3', '4', '5', '10', '20', '30'};
+        TenorsValueSet_2 = [2 3 4 5 10 20 30];
+        
+        TenorsKeySet_3 =  {'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '15', '20', '25', '30'};
+        TenorsValueSet_3 = [1 2 3 4 5 6 7 8 9 10 15 20 25 30];
+        ... more structures can be added here (then update the switch / case in the constructor)
+        
+    end
+    
+    properties (SetAccess = immutable) % solo il constructor può modificare queste proprietà
+       CurveID = []; % Bloomberg ticker for the curve
+       Name = []; % derived from the previous field
+       BBG_tickerRoot = []; % root of the BBG tickers
+       StartDate = []; % first date of the historical range
+       EndDate = []; % last date of the historical range
+       Filename = []; % name of the .mat file used to store hist data
+       DataFromBBG = []; % Bloomberg connection and opions
+       ExtSource = [];
+       % curve type:
+       % if = BBG_single: it is a Bloomberg object (eg YCGT0040 Index)
+       % containing all maturity at each date; In this case the ticker
+       % referencing the curve is provided through CurveID 
+       % if = BBG_multiple: there is a BBG ticker for each maturity. EG
+       % F91003M Index, F91006M Index, ... F91004Y Index, etc...... In this
+       % case CurveID contains the curve ticker (eg F9100) and the
+       % appropriate method will try for sewveral maturities to populate
+       % the curve
+       ctype = []; 
+       invertBbgSigns = [];
+       BBG_YellowKey = [];
+       RatesInputFormat = [];
+       % Mapping Bloomberg tenors to year fraction chosen based on the
+       % input parameter .TenorsKeyMapping_choice
+       TenorsMap;
+       TenorsKeySet = [];
+       TenorsValueSet = [];
+       IntExt = []; % Internal/External risk factor
+       ToBeIncludedInInvariants = [];
+    end
+    
+    methods
+        function C = IR_Curve(params) % constructor
+            % params is a struct array with the following fields
+            % -> DataFromBBG: bloomberg connection obj and Bloomberg data
+            % options
+            % DataFromBBG.BBGconn: BBG connection object; IF EMPTY TRIES TO FIND A
+            % SAVED VERSION OF THE CURVE
+            % -> CurveID: BBG identifier for the curve (e.g. USA_Govt_YCurve_FMC, FRGovtCurveFMC, etc.)
+            % (must be defined accordingly to ctype)
+            % -> BBG_tickerRoot: must be the root needed to build the
+            % Bloomberg tickers (only required when the curve is downloaded
+            % from Bloomberg. See IR_Curves sheet in InvestmentUniverse.m file)
+            % -> ctype: 'BBG_single' or 'BBG_multiple'
+            % -> StartDate: start date in the format mm/dd/yyyy (< than current date: no checks implemented)
+            % -> EndDate: last date in the format mm/dd/yyyy
+            % -> ExtSource (from 4.7.2016): if this field is not empty, it
+            % will take precedence over any other condition related to
+            % BBGconn field: if ExtSource is not  empty it must contain a
+            % subfield 'Curve' generated by the methods
+            % 'ReadCurveDataFromXls' or BootstrappedCurve2IR_Curve of class
+            % Utilities, containing all the subfields needed to build the
+            % object
+            % -> TenorsKeyMapping_choice: to choose the appropriate Tenors
+            % mapping as explained above
+            % -> invertBbgSigns: True when the signs of the rates downloaded
+            % from Bloomberg need to be inverted (e.g. for ILSS), False
+            % otherwise
+            % -> BBG_YellowKey: Bloomberg YKey to be used for download
+            % (e.g. Index, Curncy, ...)
+            % -> RatesInputFormat: format of the inputs read from the input
+            % source: 'f' for fraction (e.g. 0.02 meand 2%), 'bps' for
+            % basis points, 'p' for percentage (e.g. 10 means 10%)
+            % ->  int_ext: 'External' if the curve has to be included in the
+            % External Risk Factors obj of class External_Risk_Factors that
+            % will be created within  AA_DashBoard
+            % -> ToBeIncludedInInvariants:  this parameters specify if, when
+            % int_ext == 'External', it has to be included within the
+            % AllInvariants matrix of the obj of class universe (in this
+            % case it will be included in the semiparametric distribution
+            % modeling, resampling, projection to the horizon process)
+            
+            name = strrep(params.CurveID,' ','_');
+            filename = [name,'.mat'];               % costruito tramite input
+            C.CurveID = params.CurveID;             % passato in input
+            C.ctype = params.ctype;                 % passato in input
+            C.Name = name;                          % costruito tramite input
+            C.BBG_tickerRoot = params.BBG_tickerRoot;
+            C.DataFromBBG = params.DataFromBBG;     % passato in input
+            C.StartDate = params.StartDate;         % passato in input
+            C.EndDate = params.EndDate;   
+            C.Filename = filename;                  % costruito tramite input
+            C.invertBbgSigns = params.invertBbgSigns;
+            C.BBG_YellowKey = params.BBG_YellowKey;
+            C.RatesInputFormat = params.RatesInputFormat;
+            C.IntExt = params.int_ext;
+            if isfield(params,'ToBeIncludedInInvariants')
+                % to avoid exceptions if this input field is not provided
+                % (e.g. it is needed for AA purposes, when instances of the
+                % the class are used as inputs to objects of class
+                % universe, but it is not needed for FA for example)
+                C.ToBeIncludedInInvariants = params.ToBeIncludedInInvariants;
+            end
+            
+            switch params.TenorsKeyMapping_choice
+                case 1
+                    C.TenorsKeySet = C.TenorsKeySet_1;
+                    C.TenorsValueSet = C.TenorsValueSet_1;
+                case 2
+                    C.TenorsKeySet = C.TenorsKeySet_2;
+                    C.TenorsValueSet = C.TenorsValueSet_2;
+                 case 3
+                    C.TenorsKeySet = C.TenorsKeySet_3;
+                    C.TenorsValueSet = C.TenorsValueSet_3;   
+            end
+            
+            C.TenorsMap = containers.Map(C.TenorsKeySet,C.TenorsValueSet);
+            
+            if isfield(params,'ExtSource')
+                C.ExtSource = params.ExtSource;
+            end
+            if ~isempty(C.ExtSource)
+                C.Curve.dates = C.ExtSource.Curve.dates;
+                if isfield(C.ExtSource.Curve,'data')
+                    C.Curve.rates = C.ExtSource.Curve.data;
+                elseif isfield(C.ExtSource.Curve,'rates')
+                    C.Curve.rates = C.ExtSource.Curve.rates;
+                end
+                C.Curve.tenors = C.ExtSource.Curve.tenors;
+                if iscell(C.ExtSource.Curve.tenors_yf)
+                    C.Curve.tenors_yf = cell2mat(C.ExtSource.Curve.tenors_yf);
+                else
+                    C.Curve.tenors_yf = C.ExtSource.Curve.tenors_yf;
+                end
+                
+                switch C.RatesInputFormat
+                    case 'f'
+                        % nothing to do: this is the default
+                    case 'bps'
+                        C.Curve.rates  = C.Curve.rates./10000;
+                    case 'p'
+                        C.Curve.rates  = C.Curve.rates./100;
+                end
+                
+            else
+                if isempty(params.DataFromBBG.BBG_conn)
+                    % if BBGconn object is not provided (empty field) search
+                    % the current dir for a previously saved version of the
+                    % curve
+                    disp('Trying to retrieve a previously saved version of the curve');
+                    ff = dir(C.Filename);
+                    if numel(ff) == 0
+                        disp('NO PREVIOUSLY SAVED CURVE FOUND: NO CURVE OBJ CREATED');
+                        return
+                    else
+                        m = ['Previously saved (on ',datestr(ff.datenum),') version of the curve uploaded'];
+                        disp(m);
+                        OldC = load(ff.name);
+                        C.Curve = OldC.curve;
+                    end
+                else
+                    C.Update_Curve;
+                end
+            end
+            C.Curve.RatesFormat = C.RatesFormat;
+            C.Curve.RatesType = params.RatesType;
+            C.DiscountFactors;
+            % flag that indicates if mixed interpo has been
+            % performed on rates (through the method .MixedInterpolation)
+            C.Curve.MixedInterpolationPerformed = false(1);
+        end
+        
+        function Update_Curve(C)
+            
+            if strcmp(C.ctype,'BBG_single')
+                % in this case an existing archive is searched and if it
+                % exists it is updated
+                disp(['Updating IR Curve: ',C.Name]);
+                serarchf = dir(C.Filename);
+                if size(serarchf,1) == 0
+                    % the archive for the curve hasn't been generated yet
+                    dtn = datenum(C.StartDate);
+                    cnt = 0;
+                    Curve.dates = [];
+                    Curve.rates = [];
+                    row_idx = 1;
+                else
+                    % TODO: this has to be reviewd: more checks needed to
+                    % make it robust enough
+                    % an archive exists: UPDATING from the last available date
+                    % to the most recent one: updating starting from the last
+                    % available date in the dataset
+                    load(C.Filename);
+                    if Curve.dates(1)>(datenum(C.StartDate) + 5) % TODO: parametrize this 5 !
+                        % if the history starts later than 5 days after the requested
+                        % starting date than the full history is generated (same outcome as when there is no saved file)
+                        dtn = datenum(C.StartDate);
+                        Curve.dates = [];
+                        Curve.rates = [];
+                        Curve.tenors = [];
+                        Curve.tenors_yf = [];
+                        row_idx = 1;
+                    else
+                        dtn = Curve.dates(end) + 1; % starting date for history's update
+                        row_idx = size(Curve.rates,1) + 1; % starting row for Curve.rates update
+                    end
+                end
+                
+                for d = dtn:today
+                    
+                    if isbusday(d)
+                        
+                        disp(['Downloading curve for date: ',datestr(d)]);
+                        
+                        dtr = datestr(d,'yyyymmdd'); % date for BBG request
+                        
+                        % getting Bloomberg static data through an instance
+                        % of class Utility
+                        uparam.DataFromBBG = C.DataFromBBG;
+                        uparam.ticker = C.BBG_tickerRoot;
+                        uparam.fields = {'CURVE_TENOR_RATES','CURVE_DATE'};
+                        uparam.override_fields = ['CURVE_DATE'];
+                        uparam.override_values = dtr;
+                        U = Utilities(uparam);
+                        U.GetBBG_StaticData;
+                        d1 = U.Output.BBG_getdata;
+
+                        s = size(d1.CURVE_TENOR_RATES{1,1}(:,:));
+                        tenors = d1.CURVE_TENOR_RATES{1,1}(:,1);
+                        rates = d1.CURVE_TENOR_RATES{1,1}(:,4);
+                        rates = cell2mat(rates);
+                        
+                        switch C.RatesInputFormat
+                            case 'f'
+                                % nothing to do: this is the default
+                            case 'bps'
+                                rates  = rates./10000;
+                            case 'p'
+                                rates  = rates./100;
+                        end
+                    
+                        % The tenors'structure will reflect the tenors
+                        % available in Bloomberg: there will be a 1 to 1
+                        % correspondence between tenors in Curve.tenors and
+                        % the hist rates put in the columns of Curve.rates
+                        
+                        [i1,i2] = ismember(C.TenorsKeySet,tenors); % significant values in tenors (downloaded)
+                        
+                        fi1 = find(i1); % corresponding column indices in rates matrix
+                        fi2 = find(i2); % corresponding column TenorsKeySet
+                        i2(i2==0) = [];
+                        
+                        Curve.dates = [Curve.dates;d];
+                        Curve.rates(row_idx,:) = rates(i2)';
+                        Curve.tenors = C.TenorsKeySet(fi2);
+                        Curve.tenors_yf = C.TenorsValueSet(fi2);
+                        
+                        row_idx = row_idx + 1;
+                    end
+                    
+                end % d (days in history)
+                C.Curve = Curve;
+                save(C.Filename,'Curve'); % saving the curve to the disk
+                
+            elseif strcmp(C.ctype,'BBG_multiple') % ***********************
+                % in this case the whole history is downloaded each time
+                % TODO: possible to build an history even in this case and
+                % simply update it at each call  
+                disp(['Downloading IR Curve for the whole hist period: ',C.Name]);
+                
+                nmat = size(C.TenorsKeySet,2);
+                cnt = 0;
+                for k=1:nmat
+                    % scanning the C.TenorsKeySet to create BBG tickers
+                    % whereas prices are available a point (with full
+                    % history) on the curve is created
+                    
+                    if C.TenorsMap(C.TenorsKeySet{k})<=9
+                        ticker = [C.BBG_tickerRoot,C.TenorsKeySet{k},' ',C.BBG_YellowKey];
+                    else
+                        ticker = [C.BBG_tickerRoot(1:end-1),C.TenorsKeySet{k},' ',C.BBG_YellowKey];
+                    end
+                    % getting historical data through
+                    % an instance of class Utilities
+                    uparam.DataFromBBG = C.DataFromBBG;
+                    uparam.ticker = ticker;
+                    uparam.fields = ['LAST_PRICE'];
+                    uparam.history_start_date = C.StartDate;
+                    uparam.history_end_date = C.EndDate;
+                    uparam.granularity = ['daily'];
+                    U = Utilities(uparam);
+                    U.GetHistPrices;
+                    d1 = U.Output.HistInfo;
+                    
+                    if isempty(d1)
+                        continue; % if the tenor is not available on BBG, skip it
+                    end
+                    
+                    switch C.RatesInputFormat
+                        case 'f'
+                            % nothing to do: this is the default
+                        case 'bps'
+                            d1(:,2) = d1(:,2)./10000;
+                        case 'p'
+                            d1(:,2) = d1(:,2)./100;
+                    end
+
+                    if C.invertBbgSigns
+                        d1(:,2) = -d1(:,2);
+                    end
+                    if isnumeric(d1(1))
+                        cnt = cnt + 1;
+                        % build an fts obj for subsequent merge
+                        nm = ['mat_',C.TenorsKeySet{k}];
+                        %fts.(nm) = fints(d1(:,1),d1(:,2),nm,'D');
+                        fts.(nm) = timetable(datetime(d1(:,1), 'ConvertFrom', 'datenum'),d1(:,2),'VariableNames',{nm});
+                        C.Curve.tenors{1,cnt} = C.TenorsKeySet{k};
+                        C.Curve.tenors_yf(1,cnt) = C.TenorsMap(C.TenorsKeySet{k});
+                        
+                        % M E R G I N G
+                        if cnt==1
+                            allfts =  fts.(nm);
+                        else
+                            % TODO: review the merging method used here
+                            %allfts = merge(allfts,fts.(nm),'DateSetMethod','union','DataSetMethod','closest','SortColumns',0);
+                            allfts = outerjoin(allfts,fts.(nm),'MergeKeys',true);
+                            allfts = fillmissing(allfts,'nearest');
+                        end
+                    end
+                    
+                end % k
+                %allrates = fts2mat(allfts);
+                allrates = allfts.Variables;
+                
+                % Populate remaining fields of the output structure
+                for k=1:cnt
+                    %C.Curve.dates = allfts.dates;
+                    %C.Curve.rates(:,k) =  allrates(:,k);
+                    C.Curve.rates(:,k) = allrates(:,k);
+                end
+                C.Curve.dates = datenum(allfts.Time);
+
+                % saving the curve
+                curve = C.Curve;
+                save(C.Filename,'curve'); % saving the curve to the disk
+                
+                    
+            end % if on C.ctype
+            
+        end % update_curve method
+        
+        function DeleteHistory(C)
+            % to delete a poreviously saved history
+            delete (C.Filename);
+        end
+        
+        function DiscountFactors(C)
+           % given that obj.curve exists, here the history of discount factors is calculated
+           disp('Deriving disc factors for the whole hist timeseries');
+           % df(tau) = exp(-rate*tau); % apply to each rate using the
+           % appropriate year fraction (tau)
+           if size(C.Curve.tenors_yf,1)>1
+               rep_tenors_yf = repmat(C.Curve.tenors_yf',size(C.Curve.rates,1),1);
+           else
+               rep_tenors_yf = repmat(C.Curve.tenors_yf,size(C.Curve.rates,1),1);
+           end
+           C.Curve.df = exp(-C.Curve.rates.*rep_tenors_yf);
+        end
+        
+        function MixedInterpolation(C,thresholdForInterpolating,extrapolate)
+            disp('Interpolating IR curves to fill in missing values');
+            up.interType = 'linear';
+            up.thresholdForInterpolating = thresholdForInterpolating; 
+            up.extrapolate = extrapolate; 
+            up.hCurve = C.Curve.rates;
+            up.tenors = C.Curve.tenors_yf;
+            U = Utilities(up);
+            U.InterpolationMixed;
+            C.Curve.rates = U.Output.MixedInterpolatedMatrix;
+            C.Curve.MixedInterpolationPerformed = true(1);
+        end
+    end
+    
+    methods(Static)
+        
+    end
+end
+
