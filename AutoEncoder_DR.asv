@@ -26,12 +26,12 @@ classdef AutoEncoder_DR < handle
     % InputParams.divideFcn: 'dividerand' Divide data randomly (other possibilities could be found in matlab help
     % InputParams.divideMode: 'time' or 'sample' (time is our choise);
     % InputParams.divideParam.trainRatio: % of data set used for training 
-    % InputParams.divideParam.valRatio = 15/100;
-    % InputParams.divideParam.testRatio = 15/100;
-    % InputParams.Delays = [0 1 2 10];
-    % InputParams.LossFcn = 'mse'; % 'msesparse'; % Loss function used to train the net 
-    % InputParams.trainFcn = 'trainlm'; % use with mse
-    % InputParams.trainFcn = 'trainscg'; % use with msesparse
+    % InputParams.divideParam.valRatio: % of data set used for validation
+    % InputParams.divideParam.testRatio: % of data set used for testing
+    % InputParams.Delays: time delays to be used as input (eg [0 1 2 10])
+    % InputParams.LossFcn: 'mse'; % 'msesparse'; % Loss function used to train the net (with delays only mse is allowed)
+    % InputParams.trainFcn = 'trainlm'; % used with mse
+    % InputParams.trainFcn = 'trainscg'; % used with msesparse
     
     properties (Constant)
         SeeNNtraining = true(1); % to see or not to see the nntraintool

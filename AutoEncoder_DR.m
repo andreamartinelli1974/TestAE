@@ -34,7 +34,7 @@ classdef AutoEncoder_DR < handle
     % InputParams.trainFcn = 'trainscg'; % used with msesparse
     
     properties (Constant)
-        SeeNNtraining = true(1); % to see or not to see the nntraintool
+        SeeNNtraining = false(1); % true(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)

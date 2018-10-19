@@ -17,14 +17,14 @@ addpath(['C:\Users\' userId '\Documents\GitHub\Utilities\'], ...
 datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
-load([datapath,'DAA_params'])
+load([datapath,'DAA_paramsTest'])
 DAA_params.StartDay = '5/2/2018';
-load([datapath,'Univ']);
+load([datapath,'UniverseTest']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend'])
 
 for ii = 1:1
-    AEparams.HiddenSize = 30;
+    AEparams.HiddenSize = 5;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
@@ -42,7 +42,7 @@ for ii = 1:1
     
     DAA_params.AEparams = AEparams;
     
-    DAA_params.ARMAGARCH = 0;
+    %DAA_params.ARMAGARCH = 0;
     DAA_params.UseAutoEncoder = true;
     Universe_1.Dynamic_AA_1(DAA_params,[]);
     

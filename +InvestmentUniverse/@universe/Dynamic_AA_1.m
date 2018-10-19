@@ -559,7 +559,7 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                             AutoEncoder.SetNet;
                             
                             TrainigSet = X';
-                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainigSet,'encode');
+                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainigSet,'encode')';
                         end
                             % *********************************************************
                         % modelling invariants based on a semiparametric approach
@@ -676,7 +676,7 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         debug_OUT.TAILS = {HistLD HistUD SimLD SimUD DiffLD DiffUD};
                         
                         if DAA_params.UseAutoEncoder == true
-                            X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode');
+                            X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode')';
                         end
                         
                         % ***** END OF TAILS CODEPENDENNCE MONITORING *****
