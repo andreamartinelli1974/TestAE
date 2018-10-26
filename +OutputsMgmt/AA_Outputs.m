@@ -176,7 +176,8 @@ classdef AA_Outputs < handle
                     % Check if it exists and if you want to ovewrite.
                     if exist([ReportsDir filename], 'file') == 2   % Check if initialization parameter exist.
                         
-                        choice = questdlg('File exists. Are you sure you want to overwrite ?','Options','Yes', 'Continue to next tab','Cancel','Cancel');
+                        %choice = questdlg('File exists. Are you sure you want to overwrite ?','Options','Yes', 'Continue to next tab','Cancel','Cancel');
+                        choice = 'Continue to next tab';
                         switch choice
                             case 'Yes'
                                 % Delete file and rerun function.

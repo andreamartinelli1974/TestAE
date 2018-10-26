@@ -559,7 +559,8 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                             AutoEncoder.SetNet;
                             
                             TrainigSet = X';
-                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainigSet,'encode')';
+                            [DataSet4Modeling,Xf,Af] = AutoEncoder.EncDecFunction(TrainigSet,'encode');
+                            DataSet4Modeling = DataSet4Modeling';
                         end
                             % *********************************************************
                         % modelling invariants based on a semiparametric approach
@@ -878,16 +879,14 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                     if DAA_params.UseAutoEncoder == true
                         U.Debug.AE.WITH.X_simulated{counterAE} = X_simulated;
                         U.Debug.AE.WITH.runningtime{counterAE} = runningtime;
+                        U.Debug.AE.WITH.AutoCorrFlag{counterAE} = AutoEncoder.AutoCorrFlag;
+                        U.Debug.AE.WITH.X_Projected{counterAE} = X_Projected;
                     else
                         U.Debug.AE.WITHOUT.X_simulated{counterAE} = X_simulated;
                         U.Debug.AE.WITHOUT.runningtime{counterAE} = runningtime;
-                    end
-                    
-                    if DAA_params.UseAutoEncoder == true
-                        U.Debug.AE.WITH.X_Projected{counterAE} = X_Projected;
-                    else
                         U.Debug.AE.WITHOUT.X_Projected{counterAE} = X_Projected;
                     end
+                    
                     counterAE = counterAE+1; % for debug storing purposes
                     % *****************************************************
                     % adding information related to historical projected

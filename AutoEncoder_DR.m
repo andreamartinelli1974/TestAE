@@ -32,9 +32,10 @@ classdef AutoEncoder_DR < handle
     % InputParams.LossFcn: 'mse'; % 'msesparse'; % Loss function used to train the net (with delays only mse is allowed)
     % InputParams.trainFcn = 'trainlm'; % used with mse
     % InputParams.trainFcn = 'trainscg'; % used with msesparse
+    % InputParams.SquareRet = true(1); % false(1) % use also the suared returns in input to catch vola autoreg
     
     properties (Constant)
-        SeeNNtraining = false(1); % true(1); % to see or not to see the nntraintool
+        SeeNNtraining =  true(1); % false(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
@@ -48,11 +49,7 @@ classdef AutoEncoder_DR < handle
        AutoEncNet = []; % the net created from the autoencoder to expand the choice of params and features
        OptimalParameters = []; % Optimal parameters for thr net to be found with a spot check test
        OptimalPerformance = []; % performance of the net with optimal parameters from spot check test
-       InputSet2Encode = []; % Set of data to be encoded
-       InputSet2Decode = []; % Set of data to be decoded
-       
-       CodedSet = []; % set of encoded data (with shrinked dimension)
-       SimulatedSet = []; % set of decoded data (same dimension of the InputSet)
+       AutoCorrFlag = []; % to store the lbqtest results on encoded features
        OUT4Debug = []; % for debugging and fine tuning purposes
     end
     
@@ -63,6 +60,11 @@ classdef AutoEncoder_DR < handle
             
             % a) train the native autoencoder:
             AE.InputParams = InputParams;
+            
+            if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
+                sqR = TrainingSet.^2;
+                TrainingSet = [TrainingSet; sqR];
+            end
             AE.Seed = trainAutoencoder(TrainingSet, AE.InputParams.HiddenSize,...
                 'EncoderTransferFunction','logsig',...
                 'DecoderTransferFunction', 'purelin',...
@@ -169,7 +171,7 @@ classdef AutoEncoder_DR < handle
                             net1.performParam.L2WeightRegularization = L2WeightRegularization(L);
                             
                             % ****  TRAIN *****
-                            [net1,tr] = train(net1,AE.TrainingSet,AE.Targets);
+                            [net1,tr] = train(net1,AE.TrainingSet,AE.Targets,'useParallel','yes','reduction',2);
                             % nntraintool('close');
                             
                             % Test the Network
@@ -206,7 +208,7 @@ classdef AutoEncoder_DR < handle
                     net1.performParam.regularization = regularization(L);
                     
                     % ****  TRAIN *****
-                    [net1,tr] = train(net1,AE.TrainingSet,AE.Targets);
+                    [net1,tr] = train(net1,AE.TrainingSet,AE.Targets,'useParallel','yes','reduction',2);
                     % nntraintool('close');
                     
                     % Test the Network
@@ -281,6 +283,12 @@ classdef AutoEncoder_DR < handle
             %%%%%%     to be encoded/decoded (n series x t timesteps)
             %%%%%% op_type: 'encode' or 'decode'
             
+            if AE.InputParams.SquareRet && strcmp(op_type,'encode')
+                % in case we are interested in vola dependencies and autoregression
+                % must be used only in the 'encode' input
+                sqR = InputX.^2;
+                InputX = [InputX; sqR];
+            end
             
             % Format Input Arguments
             if ~iscell(InputX)
@@ -397,9 +405,21 @@ classdef AutoEncoder_DR < handle
                 Af = cell(2,0);
                 
             end
+
             % Format Output Arguments
-            
             output = cell2mat(output);
+            
+                        % check for autocorrelation in features using lbqtest
+            if strcmp(op_type,'encode') % when used for encoding
+                nrFeature = size(output,1);
+                AE.AutoCorrFlag = zeros(nrFeature,4);
+                for j = 1:nrFeature
+                    Fres = output(j,:) - mean(output(j,:));
+                    AE.AutoCorrFlag(j,:) = lbqtest(Fres);
+                end
+            end
+            
+            %%% USEFUL FUNCTION 
             
             % Map Minimum and Maximum Input Processing Function
             function y = mapminmax_apply(x,settings)
