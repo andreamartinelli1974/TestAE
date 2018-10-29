@@ -553,14 +553,14 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         if DAA_params.UseAutoEncoder == false
                             DataSet4Modeling = X;
                         else
-                            
-                            AutoEncoder.parametersSpotCheck;
-                            
-                            AutoEncoder.SetNet;
-                            
                             TrainigSet = X';
-                            [DataSet4Modeling,Xf,Af] = AutoEncoder.EncDecFunction(TrainigSet,'encode');
-                            DataSet4Modeling = DataSet4Modeling';
+                            
+                            AutoEncoder.parametersSpotCheck(TrainigSet);
+                            
+                            AutoEncoder.SetNet(TrainigSet);
+                            
+                            
+                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainigSet,'encode')';
                         end
                             % *********************************************************
                         % modelling invariants based on a semiparametric approach
@@ -580,12 +580,13 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         
                         evt_params.toBeCentered = false(1); % TODO: parametrize (with the remaining evt_params parameters)
                         
-%                         if ~usingArmagarch
+                        
+                        if DAA_params.UseAutoEncoder == true && DAA_params.AEparams.ScaleData == true
+                            % centered already in this case
+                            X_centered = DataSet4Modeling;
+                        else
                             X_centered = bsxfun(@minus, DataSet4Modeling, mu_X);
-%                         elseif usingArmagarch
-%                             % centered already in this case
-%                             X_centered = DataSet4Modeling;
-%                         end
+                        end
                         
                         X_centered_fullHistory = bsxfun(@minus, X_fullHistory, mu_X_fullHistory);
                         
@@ -596,12 +597,13 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         
                         X_simulated = EVT.Simulated_X;
 
-                        
-%                         if ~usingArmagarch
+                        if DAA_params.UseAutoEncoder == true && DAA_params.AEparams.ScaleData == true
+                            % centered already in this case
+                            % don't need to add back the mean (see IF statement above)
+                        else
                             X_simulated = bsxfun(@plus, X_simulated, mu_X); % new simulated 'X'
-%                         elseif usingArmagarch
-%                            % don't need to add back the mean (see IF statement above) 
-%                         end
+                        end
+                        
                         % ***************
                         
                         debug_OUT.EVT = EVT.OUT;
@@ -881,6 +883,8 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         U.Debug.AE.WITH.runningtime{counterAE} = runningtime;
                         U.Debug.AE.WITH.AutoCorrFlag{counterAE} = AutoEncoder.AutoCorrFlag;
                         U.Debug.AE.WITH.X_Projected{counterAE} = X_Projected;
+                        U.Debug.AE.AE_net = AutoEncoder.AutoEncNet;
+                        U.Debug.AE.AEobj = AutoEncoder;
                     else
                         U.Debug.AE.WITHOUT.X_simulated{counterAE} = X_simulated;
                         U.Debug.AE.WITHOUT.runningtime{counterAE} = runningtime;
