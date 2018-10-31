@@ -17,15 +17,16 @@ addpath(['C:\Users\' userId '\Documents\GitHub\Utilities\'], ...
 datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
-load([datapath,'DAA_paramsSMALL'])
+load([datapath,'DAA_paramsEquityFull'])
 DAA_params.StartDay = '5/2/2018';
-load([datapath,'UniverseSMALL']);
+load([datapath,'UniverseEquityFull']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend'])
 
 %% getting some 'names' needed for output purposes
 
 DAA_params.RiskBudgeting = false(1);  
+DAA_params.riskAnalysisFlag = 0;
 
 % BackTest outputs to Excel
 if DAA_params.QuantSignals
@@ -78,7 +79,8 @@ for ii = 1:numtest
     import OutputsMgmt.*;
     
     BT_params.targetType =  'level';
-    BT_params.target =  [0.01 0.015];
+    % BT_params.target =  [0.0 inf];
+    BT_params.target =  [0.005 0.015];
     
     BT_params.targetName = ['Risk']; % ['ExpectedReturn']; % 
     BT_params.FixRebalThreshold = 0; %0.10; % size of the outbalance for a single asset to be considered for the purpose of rebalancing

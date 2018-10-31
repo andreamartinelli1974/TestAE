@@ -35,7 +35,7 @@ classdef AutoEncoder_DR < handle
     % InputParams.SquareRet = true(1); % false(1) % use also the suared returns in input to catch vola autoreg
     
     properties (Constant)
-        SeeNNtraining =  true(1); % false(1); % to see or not to see the nntraintool
+        SeeNNtraining =   false(1); % true(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
