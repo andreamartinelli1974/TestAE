@@ -18,7 +18,7 @@ datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
 load([datapath,'DAA_paramsEquityFull'])
-DAA_params.StartDay = '5/2/2018';
+DAA_params.StartDay = '5/2/2017';
 load([datapath,'UniverseEquityFull']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend'])
@@ -43,10 +43,18 @@ else
     end
 end
 
-numtest = 1;
+numtest = 2;
 
 for ii = 1:numtest
-    AEparams.HiddenSize = 30*ii;
+    
+    
+    if ii == 1
+        DAA_params.AEafterResampling =  false(1);
+    else
+        DAA_params.AEafterResampling = true(1);
+    end
+    
+    AEparams.HiddenSize = 30;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
@@ -67,7 +75,7 @@ for ii = 1:numtest
     
     DAA_params.ARMAGARCH = 0;
     DAA_params.Priori_MovWin = 400;
-    DAA_params.MinFreqOfPriorUpdate = 10;   
+    %DAA_params.MinFreqOfPriorUpdate = 10;   
     
     DAA_params.UseAutoEncoder = true;
     Universe_1.Dynamic_AA_1(DAA_params,[]);
@@ -80,10 +88,10 @@ for ii = 1:numtest
     
     BT_params.targetType =  'level';
     % BT_params.target =  [0.0 inf];
-    BT_params.target =  [0.005 0.015];
+    BT_params.target =  [0.002 0.004];
     
     BT_params.targetName = ['Risk']; % ['ExpectedReturn']; % 
-    BT_params.FixRebalThreshold = 0; %0.10; % size of the outbalance for a single asset to be considered for the purpose of rebalancing
+    BT_params.FixRebalThreshold = Inf; %0.10; % size of the outbalance for a single asset to be considered for the purpose of rebalancing
     BT_params.FixedRebalCost_pct = 0.00001; % fixed % rebal cost0
     BT_params.MinOutW_Assets = 10; % min no of assets that need to be rebalanced
     BT_params.VolaAndES_window = 100; % rolling window used to compute moving std and ES for the portfolio equity line
@@ -104,7 +112,7 @@ for ii = 1:numtest
     outputs.GetAllocationsHistory;
     outputs.GetReturnAndRiskMetrics(10);
     
-    reportFileName = [DAA_params.SetUpName,'_',datestr(date,'yyyymmdd')];
+    reportFileName = [DAA_params.SetUpName,'_AE_',datestr(date,'yyyymmdd')];
     
     outputs.ExcelOutput('Report1',reportFileName,Label4Output,DAA_params.ReportDir);
     
@@ -136,7 +144,7 @@ outputs = AA_Outputs(Universe_1,BT_params,['Dynamic_AA_1']);
 outputs.GetAllocationsHistory;
 outputs.GetReturnAndRiskMetrics(10);
 
-reportFileName = [DAA_params.SetUpName,'_',datestr(date,'yyyymmdd')];
+reportFileName = [DAA_params.SetUpName,'_AE_',datestr(date,'yyyymmdd')];
 
 outputs.ExcelOutput('Report1',reportFileName,Label4Output,DAA_params.ReportDir);
 

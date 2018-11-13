@@ -678,7 +678,7 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         
                         debug_OUT.TAILS = {HistLD HistUD SimLD SimUD DiffLD DiffUD};
                         
-                        if DAA_params.UseAutoEncoder == true && ~DAA_params.AEafterResampling
+                        if DAA_params.UseAutoEncoder == true && DAA_params.AEafterResampling
                             X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode')';
                         end
                         
@@ -864,15 +864,15 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                             X_Projected = sum(X_Resampled,3);
                         end
                         
-                        if DAA_params.UseAutoEncoder == true && DAA_params.AEafterResampling
-                           
-                            [tt,invariants] = size(X); 
-                            X_res_final = zeros(DAA_params.ProjectionResampling_numsim,invariants,HorizonDays);
+                        if DAA_params.UseAutoEncoder == true && ~DAA_params.AEafterResampling
+                            X_Projected = AutoEncoder.EncDecFunction(X_Projected','decode')';
+                            [simulation,invarants] = size(X_Projected); 
+                            X_res_final = [];
                             for i = 1:size(X_Resampled,3)
-                                X_res_final(:,:,i) = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
+                                temp = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
+                                X_res_final = [X_res_final,temp]
                             end
-                            X_Resampled = X_res_final;
-                            X_Projected = sum(X_Resampled,3);
+                            X_Projected = AutoEncoder.EncDecFunction(X_Projected','decode')';
                         end
                         
                         J = size(X_Projected,1); % no of joint historical scenarios
@@ -895,7 +895,6 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         U.Debug.AE.WITH.X_simulated{counterAE} = X_simulated;
                         U.Debug.AE.WITH.runningtime{counterAE} = runningtime;
                         U.Debug.AE.WITH.AutoCorrFlag{counterAE} = AutoEncoder.AutoCorrFlag;
-                        U.Debug.AE.WITH.AutoCorrFlag{counterAE} = AutoEncoder.HeteroscedFlag;
                         U.Debug.AE.WITH.X_Projected{counterAE} = X_Projected;
                         U.Debug.AE.AE_net = AutoEncoder.AutoEncNet;
                         U.Debug.AE.AEobj = AutoEncoder;
@@ -1362,8 +1361,8 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         % Using the AllInvariants matrix (field of Universe)
                         % Repricing takes place in the same cycle immediately
                         % after identifying the current price of the invariants
-                       
-                        [P_sim] = HRepricing(U,X_Resampled,NAssets,current_t_date,P0,HorizonDays,HorizonDate);
+                        if
+                        [P_sim] = HRepricing(U,X_Resampled,NAssets,current_t_date,P0,HorizonDays,HorizonDate,AEflag);
                         
                         % historical repricing for HVaR scenarios
                         HorizonDateHVaR = daysadd(current_t_date,1,13);

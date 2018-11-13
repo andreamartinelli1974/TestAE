@@ -50,7 +50,7 @@ classdef AutoEncoder_DR < handle
        OptimalParameters = []; % Optimal parameters for thr net to be found with a spot check test
        OptimalPerformance = []; % performance of the net with optimal parameters from spot check test
        AutoCorrFlag = []; % to store the lbqtest results for autoregression on encoded features
-       HeteroscedFlag = [];  % to store the lbqtest0 results for heteroscedaticity on encoded features
+       HeteroscedFlag = [];  % to store the lbqtest0 for heteroscedaticity results on encoded features
        OUT4Debug = []; % for debugging and fine tuning purposes
     end
     
@@ -437,7 +437,6 @@ classdef AutoEncoder_DR < handle
             if strcmp(op_type,'encode') % when used for encoding
                 nrFeature = size(output,1);
                 AE.AutoCorrFlag = zeros(nrFeature,4);
-                AE.HeteroscedFlag = zeros(nrFeature,4);
                 for j = 1:nrFeature
                     [h,pValue,stat,cValue] = lbqtest(output(j,:));
                     AE.AutoCorrFlag(j,:) = [h,pValue,stat,cValue];
