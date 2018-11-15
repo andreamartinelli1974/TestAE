@@ -678,6 +678,17 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         
                         debug_OUT.TAILS = {HistLD HistUD SimLD SimUD DiffLD DiffUD};
                         
+                        nrInvariants = size(DataSet4Modeling,2);
+                        AutoCorrFlag = zeros(nrInvariants,4);
+                        HeteroscedFlag = zeros(nrInvariants,4);
+                        for j = 1:nrInvariants
+                            [h,pValue,stat,cValue] = lbqtest(DataSet4Modeling(:,j));
+                            AutoCorrFlag(j,:) = [h,pValue,stat,cValue];
+                            [h,pValue,stat,cValue] = lbqtest(DataSet4Modeling(:,j).^2);
+                            HeteroscedFlag(j,:) = [h,pValue,stat,cValue];
+                        end
+    
+                        
                         if DAA_params.UseAutoEncoder == true && ~DAA_params.AEafterResampling
                             X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode')';
                         end
@@ -895,13 +906,15 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         U.Debug.AE.WITH.X_simulated{counterAE} = X_simulated;
                         U.Debug.AE.WITH.runningtime{counterAE} = runningtime;
                         U.Debug.AE.WITH.AutoCorrFlag{counterAE} = AutoEncoder.AutoCorrFlag;
-                        U.Debug.AE.WITH.AutoCorrFlag{counterAE} = AutoEncoder.HeteroscedFlag;
+                        U.Debug.AE.WITH.HeteroscedFlag{counterAE} = AutoEncoder.HeteroscedFlag;
                         U.Debug.AE.WITH.X_Projected{counterAE} = X_Projected;
                         U.Debug.AE.AE_net = AutoEncoder.AutoEncNet;
                         U.Debug.AE.AEobj = AutoEncoder;
                     else
                         U.Debug.AE.WITHOUT.X_simulated{counterAE} = X_simulated;
                         U.Debug.AE.WITHOUT.runningtime{counterAE} = runningtime;
+                        U.Debug.AE.WITHOUT.AutoCorrFlag{counterAE} = AutoCorrFlag;
+                        U.Debug.AE.WITHOUT.HeteroscedFlag{counterAE} = HeteroscedFlag;
                         U.Debug.AE.WITHOUT.X_Projected{counterAE} = X_Projected;
                     end
                     

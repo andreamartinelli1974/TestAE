@@ -260,6 +260,9 @@ classdef EVT_CopulaSim < handle
                     
                     % ****************
                     [E1,x] = ecdf(shapeEstimates,'bounds','on');
+                    if size(E1) ~= size(x)
+                        pause
+                    end
                     
                     ff = find(x(2:end)==x(1:end-1));
                     if ~isempty(ff)
