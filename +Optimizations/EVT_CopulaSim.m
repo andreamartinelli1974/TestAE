@@ -272,6 +272,11 @@ classdef EVT_CopulaSim < handle
                         
                     end
                     % ****************
+                    
+                    if size(x,1) == 0 || size(x,1) ~= size(E1,1)
+                        pause(2);
+                    end
+                       
                     pd = makedist('PiecewiseLinear','x',x','Fx',E1');
                     
                     
