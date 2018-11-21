@@ -679,15 +679,20 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         debug_OUT.TAILS = {HistLD HistUD SimLD SimUD DiffLD DiffUD};
                         
                         nrInvariants = size(DataSet4Modeling,2);
-                        AutoCorrFlag = zeros(nrInvariants,4);
-                        HeteroscedFlag = zeros(nrInvariants,4);
+                        AutoCorrFlag = zeros(nrInvariants,8);
+                        HeteroscedFlag = zeros(nrInvariants,8);
                         for j = 1:nrInvariants
-                            [h,pValue,stat,cValue] = lbqtest(DataSet4Modeling(:,j));
+                            [h,pValue,stat,cValue] = lbqtest(DataSet4Modeling(:,j),'lags',[1,2]);
                             AutoCorrFlag(j,:) = [h,pValue,stat,cValue];
-                            [h,pValue,stat,cValue] = lbqtest(DataSet4Modeling(:,j).^2);
+                            [h,pValue,stat,cValue] = lbqtest(DataSet4Modeling(:,j).^2,'lags',[1,2]);
                             HeteroscedFlag(j,:) = [h,pValue,stat,cValue];
+                            if(AutoCorrFlag(j,1)) == 1
+                                figure
+                                autocorr(DataSet4Modeling(:,j))
+                            end
                         end
-    
+                        pause;
+                        close all
                         
                         if DAA_params.UseAutoEncoder == true && ~DAA_params.AEafterResampling
                             X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode')';

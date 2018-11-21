@@ -21,7 +21,7 @@ load([datapath,'DAA_paramsCredit'])
 DAA_params.StartDay = '1/2/2018';
 load([datapath,'UniverseCredit']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
-save([datapath,'AssetLegend'])
+save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);
 
 %% getting some 'names' needed for output purposes
 

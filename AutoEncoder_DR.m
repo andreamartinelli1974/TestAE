@@ -436,12 +436,12 @@ classdef AutoEncoder_DR < handle
                         % check for autocorrelation in features using lbqtest
             if strcmp(op_type,'encode') % when used for encoding
                 nrFeature = size(output,1);
-                AE.AutoCorrFlag = zeros(nrFeature,4);
-                AE.HeteroscedFlag = zeros(nrFeature,4);
+                AE.AutoCorrFlag = zeros(nrFeature,8);
+                AE.HeteroscedFlag = zeros(nrFeature,8);
                 for j = 1:nrFeature
-                    [h,pValue,stat,cValue] = lbqtest(output(j,:));
+                    [h,pValue,stat,cValue] = lbqtest(output(j,:),'lags',[1,2]);
                     AE.AutoCorrFlag(j,:) = [h,pValue,stat,cValue];
-                    [h,pValue,stat,cValue] = lbqtest(output(j,:).^2);
+                    [h,pValue,stat,cValue] = lbqtest(output(j,:).^2,'lags',[1,2]);
                     AE.HeteroscedFlag(j,:) = [h,pValue,stat,cValue];
                 end
             end
