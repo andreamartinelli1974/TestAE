@@ -35,7 +35,7 @@ classdef AutoEncoder_DR < handle
     % InputParams.SquareRet = true(1); % false(1) % use also the suared returns in input to catch vola autoreg
     
     properties (Constant)
-        SeeNNtraining =   true(1); % false(1); % to see or not to see the nntraintool
+        SeeNNtraining =   false(1); % true(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
@@ -43,8 +43,8 @@ classdef AutoEncoder_DR < handle
     end
     
     properties 
-       Seed = []; % The autoencoder used to build the net object
-       DeeperNet = []; % the net created from the autoencoder to expand the choice of params and features
+       Seed = []; % The autoencoders used to build the net object
+       AutoEncNet = []; % the net created from the autoencoder to expand the choice of params and features
        TrainingSet = []; % set of data to train the AutoEncoder
        Targets = []; % set of data targets (could be different from the number of trainig set invariants)
        OptimalParameters = []; % Optimal parameters for thr net to be found with a spot check test
@@ -56,19 +56,17 @@ classdef AutoEncoder_DR < handle
     
     methods
         
-        function AE = AutoEncoder_DR(TrainingSet1,InputParams) % constructor
+        function AE = AutoEncoder_DR(TrainingSet,InputParams) % constructor
             % 2 main task:
             
-            % a) train the native autoencoders & softnet:
+            % a) train the native autoencoder:
             AE.InputParams = InputParams;
             
             if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
-                sqR = TrainingSet1.^2;
-                TrainingSet1 = [TrainingSet1; sqR];
+                sqR = TrainingSet.^2;
+                TrainingSet = [TrainingSet; sqR];
             end
-            
-            % first layer
-            AE.Seed{1} = trainAutoencoder(TrainingSet1, AE.InputParams.HiddenSize,...
+            AE.Seed = trainAutoencoder(TrainingSet, AE.InputParams.HiddenSize,...
                 'EncoderTransferFunction','logsig',...
                 'DecoderTransferFunction', 'purelin',...
                 'L2WeightRegularization', 0.0,...
@@ -77,66 +75,41 @@ classdef AutoEncoder_DR < handle
                 'MaxEpochs', 1000,...
                 'ShowProgressWindow',AE.SeeNNtraining,...
                 'ScaleData', true);
-            
-            TrainingSet2 = encode(AE.Seed{1},TrainingSet1);
-            HiddenSize2 = size(TrainingSet1,1);
-            
-            % second layer
-            AE.Seed{2} = trainAutoencoder(TrainingSet2, HiddenSize2,...
-                'EncoderTransferFunction','logsig',...
-                'DecoderTransferFunction', 'purelin',...
-                'L2WeightRegularization', 0.0,...
-                'SparsityRegularization', 1,...
-                'SparsityProportion', 0.4,...
-                'MaxEpochs', 1000,...
-                'ShowProgressWindow',AE.SeeNNtraining,...
-                'ScaleData', true);
-            
-            TrainingSet3 = encode(AE.Seed{2},TrainingSet2);
-            
-            % third layer
-            AE.Seed{3} = trainSoftmaxLayer(TrainingSet3,TrainingSet1,'LossFunction','crossentropy');
             
             % b) creates the net from the native autoencoder and set a
             % series of parameters:
             
             % Model training / testing / validation subsamples
-            AE.DeeperNet = stack(AE.Seed{1},AE.Seed{2},AE.Seed{3}); % transforming into a Matlab neural network object type
-            AE.DeeperNet.divideFcn = AE.InputParams.divideFcn; % Divide data
-            AE.DeeperNet.divideMode = AE.InputParams.divideMode;
+            AE.AutoEncNet = network(AE.Seed); % transforming into a Matlab neural network object type
+            AE.AutoEncNet.divideFcn = AE.InputParams.divideFcn; % Divide data
+            AE.AutoEncNet.divideMode = AE.InputParams.divideMode;
             % Divide up every sample
             % training, validation and test set proportions
-            AE.DeeperNet.divideParam.trainRatio = AE.InputParams.divideParam.trainRatio;
-            AE.DeeperNet.divideParam.valRatio = AE.InputParams.divideParam.valRatio;
-            AE.DeeperNet.divideParam.testRatio = AE.InputParams.divideParam.testRatio;
+            AE.AutoEncNet.divideParam.trainRatio = AE.InputParams.divideParam.trainRatio;
+            AE.AutoEncNet.divideParam.valRatio = AE.InputParams.divideParam.valRatio;
+            AE.AutoEncNet.divideParam.testRatio = AE.InputParams.divideParam.testRatio;
             % ** net.performParam.normalization = 'standard';
             
-            AE.DeeperNet.performFcn = AE.InputParams.LossFcn;
+            AE.AutoEncNet.performFcn = AE.InputParams.LossFcn;
             
-            if strcmp(AE.DeeperNet.performFcn,'mse') || strcmp(AE.DeeperNet.performFcn,'sse') 
+            if strcmp(AE.AutoEncNet.performFcn,'mse') || strcmp(AE.AutoEncNet.performFcn,'sse') 
                 % ADD A TAPPED DELAY LINE to introduce dependencies upon lagged input returns
                 % available only with mse loss function
-                AE.DeeperNet.inputWeights{1,1}.delays = AE.InputParams.Delays;
+                AE.AutoEncNet.inputWeights{1,1}.delays = AE.InputParams.Delays;
             end
             
             % transfer functions in the 2 layers (encoder/decoder)
-            AE.DeeperNet.layers{1}.transferFcn = AE.InputParams.EncoderTransferFunction; % 'radbas'; %
-            AE.DeeperNet.layers{2}.transferFcn = AE.InputParams.DecoderTransferFunction;
-            AE.DeeperNet.layers{3}.transferFcn = AE.InputParams.DecoderTransferFunction;
-            
-            % renaming layers for clarity
-            AE.DeeperNet.layers{1}.name = 'Encoder';
-            AE.DeeperNet.layers{2}.name = 'Decoder';
-            AE.DeeperNet.layers{3}.name = 'Time Delay Layer';
+            AE.AutoEncNet.layers{1}.transferFcn = AE.InputParams.EncoderTransferFunction; % 'radbas'; %
+            AE.AutoEncNet.layers{2}.transferFcn = AE.InputParams.DecoderTransferFunction;
             
             % net1.trainFcn = 'trainscg'; % use with msesparse
-            AE.DeeperNet.trainFcn = AE.InputParams.trainFcn; % use with mse
+            AE.AutoEncNet.trainFcn = AE.InputParams.trainFcn; % use with mse
             
             % When working with timeseries in Matlab Neural Network it is better to use timeseries in cell array form,
             % where each cell corresponds to a point in time. Each cell can contain more than one observed feature wrt the
             % time it refers to. See comments to the function matrixTs2CellTs
-            AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet1);
-            AE.Targets = AE.matrixTs2CellTs(TrainingSet1(1:AE.InputParams.N_myFactors,:)); % I want only the initial N_myFactors as targets
+            AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet);
+            AE.Targets = AE.matrixTs2CellTs(TrainingSet(1:AE.InputParams.N_myFactors,:)); % I want only the initial N_myFactors as targets
             
             if AE.SeeNNtraining == true
                 nntraintool('close')
@@ -166,19 +139,13 @@ classdef AutoEncoder_DR < handle
                 if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
                     sqR = TrainingSet.^2;
                     TrainingSet = [TrainingSet; sqR];
-                    Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
-                    TsqR = Target.^2;
-                    Target = [Target; TsqR];
-                else
-                    Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                 end
-            
                 AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet);
-                AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets
+                AE.Targets = AE.matrixTs2CellTs(TrainingSet(1:AE.InputParams.N_myFactors,:)); % I want only the initial N_myFactors as targets
             end
             
             
-            if strcmp(AE.DeeperNet.performFcn,'msesparse')  % WHEN USING 'msesparse' Loss Function
+            if strcmp(AE.AutoEncNet.performFcn,'msesparse')  % WHEN USING 'msesparse' Loss Function
                 
                 % TOOD: parametrize and provide as an input
                 % defining parameters combinations
@@ -205,7 +172,7 @@ classdef AutoEncoder_DR < handle
                         for L=1:nL
                             % initializes the weights matrices, while building net1
                             % from net
-                            net1 = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+                            net1 = configure(AE.AutoEncNet,AE.TrainingSet,AE.Targets);
                             
                             net1.trainParam.epochs = AE.InputParams.MaxEpoch;
                             net1.trainParam.max_fail = 8;
@@ -232,7 +199,7 @@ classdef AutoEncoder_DR < handle
                     end
                 end
                 
-            elseif strcmp(AE.DeeperNet.performFcn,'mse') || strcmp(AE.DeeperNet.performFcn,'sse')  % WHEN USING 'mse' Loss Function
+            elseif strcmp(AE.AutoEncNet.performFcn,'mse') || strcmp(AE.AutoEncNet.performFcn,'sse')  % WHEN USING 'mse' Loss Function
                 
                 % TOOD: parametrize and provide as an input
                 regularization = [10e-7:10e-3:0.2];
@@ -244,7 +211,7 @@ classdef AutoEncoder_DR < handle
                     
                     % initializes the weights matrices, while building net1
                     % from net
-                    net1 = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+                    net1 = configure(AE.AutoEncNet,AE.TrainingSet,AE.Targets);
                     
                     net1.trainParam.epochs = AE.InputParams.MaxEpoch;
                     net1.trainParam.max_fail = 8;
@@ -293,24 +260,24 @@ classdef AutoEncoder_DR < handle
             
             % initializes the weights matrices, while building net1
             % from net
-            AE.DeeperNet = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+            AE.AutoEncNet = configure(AE.AutoEncNet,AE.TrainingSet,AE.Targets);
             
-            AE.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
-            AE.DeeperNet.trainParam.max_fail = 8;
-            AE.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
+            AE.AutoEncNet.trainParam.epochs = AE.InputParams.MaxEpoch;
+            AE.AutoEncNet.trainParam.max_fail = 8;
+            AE.AutoEncNet.trainParam.showWindow = AE.SeeNNtraining;
             
-            if strcmp(AE.DeeperNet.performFcn,'msesparse') % WHEN USING 'msesparse' Loss Function
+            if strcmp(AE.AutoEncNet.performFcn,'msesparse') % WHEN USING 'msesparse' Loss Function
                 % set the parameters for the current loop
-                AE.DeeperNet.performParam.sparsityRegularization =  AE.OptimalParameters(1);
-                AE.DeeperNet.performParam.sparsity =  AE.OptimalParameters(2);
-                AE.DeeperNet.performParam.L2WeightRegularization =  AE.OptimalParameters(3); 
-            elseif strcmp(AE.DeeperNet.performFcn,'mse') || strcmp(AE.DeeperNet.performFcn,'sse') % WHEN USING 'mse' Loss Function
+                AE.AutoEncNet.performParam.sparsityRegularization =  AE.OptimalParameters(1);
+                AE.AutoEncNet.performParam.sparsity =  AE.OptimalParameters(2);
+                AE.AutoEncNet.performParam.L2WeightRegularization =  AE.OptimalParameters(3); 
+            elseif strcmp(AE.AutoEncNet.performFcn,'mse') || strcmp(AE.AutoEncNet.performFcn,'sse') % WHEN USING 'mse' Loss Function
                 % set the parameters for the current loop
-                AE.DeeperNet.performParam.regularization = AE.OptimalParameters;
+                AE.AutoEncNet.performParam.regularization = AE.OptimalParameters;
             end
             
             % ****  TRAIN *****
-            [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+            [AE.AutoEncNet,tr] = train(AE.AutoEncNet,AE.TrainingSet,AE.Targets);
             
             if AE.SeeNNtraining == true
                 nntraintool('close')
@@ -344,7 +311,7 @@ classdef AutoEncoder_DR < handle
             end
             
             if strcmp(op_type,'encode')
-                [X,Xi] = preparets(AE.DeeperNet,XX); % This function simplifies the task of
+                [X,Xi] = preparets(AE.AutoEncNet,XX); % This function simplifies the task of
                 % reformatting input and target time series.
                 % It automatically shifts time series
                 % to fill the initial input and layer delay states.
@@ -365,29 +332,29 @@ classdef AutoEncoder_DR < handle
             end
             
             % encoder bias and weights
-            bias_1 = AE.DeeperNet.b{1};
-            IW_1_1 = AE.DeeperNet.IW{1,1};
+            bias_1 = AE.AutoEncNet.b{1};
+            IW_1_1 = AE.AutoEncNet.IW{1,1};
             % decoder bias and weights
-            bias_2 = AE.DeeperNet.b{2};
-            LW_2_1 =  AE.DeeperNet.LW{2,1};
+            bias_2 = AE.AutoEncNet.b{2};
+            LW_2_1 =  AE.AutoEncNet.LW{2,1};
             
             if strcmp(op_type,'encode') % when used for encoding
                 
                 % preprocessing settings
-                preproc.ymin = AE.DeeperNet.inputs{1}.processSettings{1}.ymin;
-                preproc.gain = AE.DeeperNet.inputs{1}.processSettings{1}.gain;
-                preproc.xoffset = AE.DeeperNet.inputs{1}.processSettings{1}.xoffset;
+                preproc.ymin = AE.AutoEncNet.inputs{1}.processSettings{1}.ymin;
+                preproc.gain = AE.AutoEncNet.inputs{1}.processSettings{1}.gain;
+                preproc.xoffset = AE.AutoEncNet.inputs{1}.processSettings{1}.xoffset;
                 
             elseif strcmp(op_type,'decode') % when using for decoding
                 
                 % postprocessing settings
-                postproc.gain = AE.DeeperNet.output.processSettings{1}.gain;
-                postproc.xoffset = AE.DeeperNet.output.processSettings{1}.xoffset;
-                postproc.ymin = AE.DeeperNet.output.processSettings{1}.ymin;
+                postproc.gain = AE.AutoEncNet.output.processSettings{1}.gain;
+                postproc.xoffset = AE.AutoEncNet.output.processSettings{1}.xoffset;
+                postproc.ymin = AE.AutoEncNet.output.processSettings{1}.ymin;
                 
             end
             
-            highestDelay = AE.DeeperNet.inputWeights{1}.delays(end);
+            highestDelay = AE.AutoEncNet.inputWeights{1}.delays(end);
             
             
             if highestDelay == 0 %%%%% case with no delays %%%%%%
@@ -397,9 +364,9 @@ classdef AutoEncoder_DR < handle
                         Xp1 = mapminmax_apply(X{1,ts},preproc);
                         
                         % Layer 1 of netObj.encoder
-                        if strcmp(AE.DeeperNet.layers{1}.transferFcn,'radbas')
+                        if strcmp(AE.AutoEncNet.layers{1}.transferFcn,'radbas')
                             output{1,ts} = radbas_apply(repmat(bias_1,1,Q) + IW_1_1*Xp1); % features
-                        elseif strcmp(AE.DeeperNet.layers{1}.transferFcn,'logsig')
+                        elseif strcmp(AE.AutoEncNet.layers{1}.transferFcn,'logsig')
                             output{1,ts} = logsig_apply(repmat(bias_1,1,Q) + IW_1_1*Xp1);
                         end
                     elseif strcmp(op_type,'decode') % when using for decoding
@@ -433,11 +400,11 @@ classdef AutoEncoder_DR < handle
                         Xd1{xdts} = mapminmax_apply(X{1,ts},preproc);
                         
                         % Layer 1 of netObj.encoder
-                        tapdelay1 = cat(1,Xd1{mod(xdts-AE.DeeperNet.inputWeights{1,1}.delays-1,xdts)+1});
+                        tapdelay1 = cat(1,Xd1{mod(xdts-AE.AutoEncNet.inputWeights{1,1}.delays-1,xdts)+1});
                         
-                        if strcmp(AE.DeeperNet.layers{1}.transferFcn,'radbas')
+                        if strcmp(AE.AutoEncNet.layers{1}.transferFcn,'radbas')
                             output{1,ts} = radbas_apply(repmat(bias_1,1,Q) + IW_1_1*tapdelay1);
-                        elseif strcmp(AE.DeeperNet.layers{1}.transferFcn,'logsig')
+                        elseif strcmp(AE.AutoEncNet.layers{1}.transferFcn,'logsig')
                             output{1,ts} = logsig_apply(repmat(bias_1,1,Q) + IW_1_1*tapdelay1);
                         end
                         

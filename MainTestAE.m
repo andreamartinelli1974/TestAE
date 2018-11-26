@@ -17,9 +17,9 @@ addpath(['C:\Users\' userId '\Documents\GitHub\Utilities\'], ...
 datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
-load([datapath,'DAA_paramsCredit'])
+load([datapath,'DAA_paramsSmall'])
 DAA_params.StartDay = '1/2/2018';
-load([datapath,'UniverseCredit']);
+load([datapath,'UniverseSmall']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);
 
@@ -54,7 +54,7 @@ for ii = 1:numtest
         DAA_params.AEafterResampling = true(1);
     end
     
-    AEparams.HiddenSize = 30;
+    AEparams.HiddenSize = 5;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
@@ -66,8 +66,8 @@ for ii = 1:numtest
     AEparams.divideParam.valRatio = 15/100;
     AEparams.divideParam.testRatio = 15/100;
     AEparams.Delays = [0 1 2];
-    AEparams.LossFcn = 'sse'; % 'mse' % 'msesparse'; % Loss function used to train the net
-    AEparams.trainFcn = 'trainrp'; % use with mse 
+    AEparams.LossFcn = 'mse'; % 'sse'; % 'msesparse'; % Loss function used to train the net
+    AEparams.trainFcn = 'trainlm'; % 'trainrp'; % use with mse / sse
     % v.trainFcn = 'trainscg'; % use with msesparse
     AEparams.SquareRet =  true(1); % false(1); %  use also the suared returns in input to catch vola autoreg
     
