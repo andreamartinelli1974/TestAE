@@ -74,9 +74,8 @@ classdef AutoEncoder_DR < handle
                 'L2WeightRegularization', 0.0,...
                 'SparsityRegularization', 1,...
                 'SparsityProportion', 0.4,...
-                'MaxEpochs', 1000,...
                 'ShowProgressWindow',AE.SeeNNtraining,...
-                'ScaleData', true);
+                'ScaleData', false);
             
             TrainingSet2 = encode(AE.Seed{1},TrainingSet1);
             HiddenSize2 = size(TrainingSet1,1);
@@ -88,9 +87,8 @@ classdef AutoEncoder_DR < handle
                 'L2WeightRegularization', 0.0,...
                 'SparsityRegularization', 1,...
                 'SparsityProportion', 0.4,...
-                'MaxEpochs', 1000,...
                 'ShowProgressWindow',AE.SeeNNtraining,...
-                'ScaleData', true);
+                'ScaleData', false);
             
             TrainingSet3 = encode(AE.Seed{2},TrainingSet2);
             
@@ -101,7 +99,8 @@ classdef AutoEncoder_DR < handle
             % series of parameters:
             
             % Model training / testing / validation subsamples
-            AE.DeeperNet = stack(AE.Seed{1},AE.Seed{2},AE.Seed{3}); % transforming into a Matlab neural network object type
+            inet = stack(AE.Seed{1},AE.Seed{2},AE.Seed{3}); % transforming into a Matlab neural network object type
+            AE.DeeperNet = network(inet);
             AE.DeeperNet.divideFcn = AE.InputParams.divideFcn; % Divide data
             AE.DeeperNet.divideMode = AE.InputParams.divideMode;
             % Divide up every sample
@@ -116,11 +115,11 @@ classdef AutoEncoder_DR < handle
             if strcmp(AE.DeeperNet.performFcn,'mse') || strcmp(AE.DeeperNet.performFcn,'sse') 
                 % ADD A TAPPED DELAY LINE to introduce dependencies upon lagged input returns
                 % available only with mse loss function
-                AE.DeeperNet.inputWeights{1,1}.delays = AE.InputParams.Delays;
+                AE.DeeperNet.layerWeights{3,2}.delays = AE.InputParams.Delays;
             end
             
             % transfer functions in the 2 layers (encoder/decoder)
-            AE.DeeperNet.layers{1}.transferFcn = AE.InputParams.EncoderTransferFunction; % 'radbas'; %
+            AE.DeeperNet.layers{1}.transferFcn = AE.InputParams.EncoderTransferFunction;
             AE.DeeperNet.layers{2}.transferFcn = AE.InputParams.DecoderTransferFunction;
             AE.DeeperNet.layers{3}.transferFcn = AE.InputParams.DecoderTransferFunction;
             
@@ -135,8 +134,20 @@ classdef AutoEncoder_DR < handle
             % When working with timeseries in Matlab Neural Network it is better to use timeseries in cell array form,
             % where each cell corresponds to a point in time. Each cell can contain more than one observed feature wrt the
             % time it refers to. See comments to the function matrixTs2CellTs
+            
+            if AE.InputParams.SquareRet
+                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+                TsqR = Target.^2;
+                Target = [Target; TsqR];
+            else
+                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+            end
             AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet1);
-            AE.Targets = AE.matrixTs2CellTs(TrainingSet1(1:AE.InputParams.N_myFactors,:)); % I want only the initial N_myFactors as targets
+            AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets and eventually the squared returns    
+            
+            [Xs,Xi,Ai] = preparets(AE.DeeperNet,AE.TrainingSet);
+            
+            [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
             
             if AE.SeeNNtraining == true
                 nntraintool('close')
@@ -173,8 +184,8 @@ classdef AutoEncoder_DR < handle
                     Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                 end
             
-                AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet);
-                AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets
+                TrainingSet = AE.matrixTs2CellTs(TrainingSet);
+                Target = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets end eventually the squared returns
             end
             
             
@@ -205,7 +216,7 @@ classdef AutoEncoder_DR < handle
                         for L=1:nL
                             % initializes the weights matrices, while building net1
                             % from net
-                            net1 = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+                            net1 = configure(AE.DeeperNet,TrainingSet,Target);
                             
                             net1.trainParam.epochs = AE.InputParams.MaxEpoch;
                             net1.trainParam.max_fail = 8;
@@ -217,12 +228,13 @@ classdef AutoEncoder_DR < handle
                             net1.performParam.L2WeightRegularization = L2WeightRegularization(L);
                             
                             % ****  TRAIN *****
-                            [net1,tr] = train(net1,AE.TrainingSet,AE.Targets,'useParallel','yes','reduction',2);
+                            [Xs,Xi,Ai] = preparets(net1,TrainingSet);
+                            [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai,'useParallel','yes','reduction',2);
                             % nntraintool('close');
                             
                             % Test the Network
-                            X_hat_2 = net1(AE.TrainingSet);
-                            testTargets = cell2mat(AE.Targets) .* cell2mat(tr.testMask);
+                            X_hat_2 = net1(TrainingSet);
+                            testTargets = cell2mat(Targets) .* cell2mat(tr.testMask);
                             
                             testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
                             
@@ -244,22 +256,24 @@ classdef AutoEncoder_DR < handle
                     
                     % initializes the weights matrices, while building net1
                     % from net
-                    net1 = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+                    net1 = configure(AE.DeeperNet,TrainingSet,Target);
                     
                     net1.trainParam.epochs = AE.InputParams.MaxEpoch;
-                    net1.trainParam.max_fail = 8;
+                    net1.trainParam.max_fail = 10;
+                    net1.trainParam.mu_max = 1.00e+20;
                     net1.trainParam.showWindow = AE.SeeNNtraining;
                     
                     % set the parameters for the current loop
                     net1.performParam.regularization = regularization(L);
                     
                     % ****  TRAIN *****
-                    [net1,tr] = train(net1,AE.TrainingSet,AE.Targets,'useParallel','yes','reduction',2);
+                    [Xs,Xi,Ai] = preparets(net1,AE.TrainingSet);
+                    [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai); %,'useParallel','yes','reduction',2);
                     % nntraintool('close');
                     
                     % Test the Network
-                    X_hat_2 = net1(AE.TrainingSet);
-                    testTargets = cell2mat(AE.Targets) .* cell2mat(tr.testMask);
+                    X_hat_2 = net1(TrainingSet);
+                    testTargets = cell2mat(Target) .* cell2mat(tr.testMask);
                     
                     testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
                     
@@ -286,9 +300,14 @@ classdef AutoEncoder_DR < handle
                 if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
                     sqR = TrainingSet.^2;
                     TrainingSet = [TrainingSet; sqR];
+                    Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
+                    TsqR = Target.^2;
+                    Target = [Target; TsqR];
+                else
+                    Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                 end
                 AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet);
-                AE.Targets = AE.matrixTs2CellTs(TrainingSet(1:AE.InputParams.N_myFactors,:)); % I want only the initial N_myFactors as targets
+                AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets
             end
             
             % initializes the weights matrices, while building net1
@@ -296,8 +315,11 @@ classdef AutoEncoder_DR < handle
             AE.DeeperNet = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
             
             AE.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
-            AE.DeeperNet.trainParam.max_fail = 8;
+            AE.DeeperNet.trainParam.max_fail = 10;
+            AE.DeeperNet.trainParam.mu_max = 1.00e+50;
             AE.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
+            AE.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
+                                     'plotregression', 'plotfit'};
             
             if strcmp(AE.DeeperNet.performFcn,'msesparse') % WHEN USING 'msesparse' Loss Function
                 % set the parameters for the current loop
@@ -310,11 +332,21 @@ classdef AutoEncoder_DR < handle
             end
             
             % ****  TRAIN *****
-            [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets);
+            [Xs,Xi,Ai] = preparets(AE.DeeperNet,AE.TrainingSet);
+            [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,Xi,Ai);%,'useParallel','yes','reduction',2);
             
             if AE.SeeNNtraining == true
                 nntraintool('close')
             end
+            
+            X_hat_2 = AE.DeeperNet(AE.TrainingSet);
+            X_hat_2 = cell2mat(X_hat_2);
+            targets = cell2mat(AE.Targets);
+            e = gsubtract(targets,X_hat_2);
+            figure, plotperform(tr)
+            figure, plottrainstate(tr)
+            figure, ploterrhist(e)
+            figure, plotregression(targets,X_hat_2)
             
         end % SetNet
         
