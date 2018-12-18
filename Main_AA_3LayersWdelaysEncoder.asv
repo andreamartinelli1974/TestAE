@@ -230,8 +230,8 @@ net.layers{3}.transferFcn = 'purelin';
 net.layerWeights{3,2}.delays = [0:3];
 
 % renaming layers for clarity
-net.layers{1}.name = 'Encoder GP'
-net.layers{2}.name = 'Decoder GP'
+net.layers{1}.name = 'Encoder'
+net.layers{2}.name = 'Decoder'
 net.layers{3}.name = 'Time Delays Layer'
 
 view(net);

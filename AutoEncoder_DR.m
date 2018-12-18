@@ -63,8 +63,14 @@ classdef AutoEncoder_DR < handle
             AE.InputParams = InputParams;
             
             if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
-                sqR = TrainingSet1.^2;
-                TrainingSet1 = [TrainingSet1; sqR];
+                tmp = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+                sqR = tmp.^2;
+                TrainingSet1 = [TrainingSet1(1:AE.InputParams.N_myFactors,:); sqR; TrainingSet1(AE.InputParams.N_myFactors+1:end,:)];
+                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+                TsqR = Target.^2;
+                Target = [Target; TsqR];
+            else
+                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
             end
             
             % first layer
@@ -78,7 +84,11 @@ classdef AutoEncoder_DR < handle
                 'ScaleData', false);
             
             TrainingSet2 = encode(AE.Seed{1},TrainingSet1);
-            HiddenSize2 = size(TrainingSet1,1);
+            if AE.InputParams.SquareRet
+                HiddenSize2 = AE.InputParams.N_myFactors*2;
+            else
+                HiddenSize2 = AE.InputParams.N_myFactors;
+            end
             
             % second layer
             AE.Seed{2} = trainAutoencoder(TrainingSet2, HiddenSize2,...
@@ -93,7 +103,7 @@ classdef AutoEncoder_DR < handle
             TrainingSet3 = encode(AE.Seed{2},TrainingSet2);
             
             % third layer
-            AE.Seed{3} = trainSoftmaxLayer(TrainingSet3,TrainingSet1,'LossFunction','crossentropy');
+            AE.Seed{3} = trainSoftmaxLayer(TrainingSet3,Target,'LossFunction','crossentropy');
             
             % b) creates the net from the native autoencoder and set a
             % series of parameters:
@@ -135,13 +145,6 @@ classdef AutoEncoder_DR < handle
             % where each cell corresponds to a point in time. Each cell can contain more than one observed feature wrt the
             % time it refers to. See comments to the function matrixTs2CellTs
             
-            if AE.InputParams.SquareRet
-                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
-                TsqR = Target.^2;
-                Target = [Target; TsqR];
-            else
-                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
-            end
             AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet1);
             AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets and eventually the squared returns    
             
@@ -149,9 +152,13 @@ classdef AutoEncoder_DR < handle
             
             [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
             
+            AE.OUT4Debug.AutoEncoder_DR.tr = tr;
+            
             if AE.SeeNNtraining == true
                 nntraintool('close')
             end
+            AE.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
+                                     'plotregression', 'plotfit'};
         end % AutoEncoder_DR
         
         function parametersSpotCheck(AE,TrainingSet)
@@ -175,8 +182,9 @@ classdef AutoEncoder_DR < handle
             
             if ~isempty(TrainingSet)
                 if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
-                    sqR = TrainingSet.^2;
-                    TrainingSet = [TrainingSet; sqR];
+                    tmp = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+                    sqR = tmp.^2;
+                    TrainingSet1 = [TrainingSet1(1:AE.InputParams.N_myFactors,:); sqR; TrainingSet1(AE.InputParams.N_myFactors+1:end,:)];
                     Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                     TsqR = Target.^2;
                     Target = [Target; TsqR];
@@ -230,6 +238,8 @@ classdef AutoEncoder_DR < handle
                             % ****  TRAIN *****
                             [Xs,Xi,Ai] = preparets(net1,TrainingSet);
                             [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai,'useParallel','yes','reduction',2);
+                            
+                            AE.OUT4Debug.parametersSpotCheck.tr{L} = tr;
                             % nntraintool('close');
                             
                             % Test the Network
@@ -269,6 +279,8 @@ classdef AutoEncoder_DR < handle
                     % ****  TRAIN *****
                     [Xs,Xi,Ai] = preparets(net1,AE.TrainingSet);
                     [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai); %,'useParallel','yes','reduction',2);
+                    
+                    AE.OUT4Debug.parametersSpotCheck.tr{L} = tr;
                     % nntraintool('close');
                     
                     % Test the Network
@@ -298,8 +310,9 @@ classdef AutoEncoder_DR < handle
             
             if ~isempty(TrainingSet)
                 if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
-                    sqR = TrainingSet.^2;
-                    TrainingSet = [TrainingSet; sqR];
+                    tmp = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+                    sqR = tmp.^2;
+                    TrainingSet1 = [TrainingSet1(1:AE.InputParams.N_myFactors,:); sqR; TrainingSet1(AE.InputParams.N_myFactors+1:end,:)];
                     Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                     TsqR = Target.^2;
                     Target = [Target; TsqR];
@@ -335,22 +348,15 @@ classdef AutoEncoder_DR < handle
             [Xs,Xi,Ai] = preparets(AE.DeeperNet,AE.TrainingSet);
             [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,Xi,Ai);%,'useParallel','yes','reduction',2);
             
+            AE.OUT4Debug.SetNet.tr = tr;
+            
             if AE.SeeNNtraining == true
                 nntraintool('close')
             end
             
-            X_hat_2 = AE.DeeperNet(AE.TrainingSet);
-            X_hat_2 = cell2mat(X_hat_2);
-            targets = cell2mat(AE.Targets);
-            e = gsubtract(targets,X_hat_2);
-            figure, plotperform(tr)
-            figure, plottrainstate(tr)
-            figure, ploterrhist(e)
-            figure, plotregression(targets,X_hat_2)
-            
         end % SetNet
         
-        function [output] = EncDecFunction(AE,InputX,op_type)
+        function [output,Xf,Af] = EncDecFunction(AE,InputX,op_type)
             
             % this is a modified version of the function generated automatically by Matlab through
             % genFunction(net1,'testF'). It has been modified to parametrize some data
@@ -360,12 +366,14 @@ classdef AutoEncoder_DR < handle
             %%%%%% X = n x t double array with the series of invariants
             %%%%%%     to be encoded/decoded (n series x t timesteps)
             %%%%%% op_type: 'encode' or 'decode'
+            timeDelays = AE.DeeperNet.layerWeights{3,2}.delays;
             
             if AE.InputParams.SquareRet && strcmp(op_type,'encode')
                 % in case we are interested in vola dependencies and autoregression
                 % must be used only in the 'encode' input
-                sqR = InputX.^2;
-                InputX = [InputX; sqR];
+                tmp = InputX(1:AE.InputParams.N_myFactors,:);
+                sqR = tmp.^2;
+                InputX = [InputX(1:AE.InputParams.N_myFactors,:); sqR; InputX(AE.InputParams.N_myFactors+1:end,:)];
             end
             
             % Format Input Arguments
@@ -375,16 +383,10 @@ classdef AutoEncoder_DR < handle
                 XX = InputX;
             end
             
-            if strcmp(op_type,'encode')
-                [X,Xi] = preparets(AE.DeeperNet,XX); % This function simplifies the task of
-                % reformatting input and target time series.
-                % It automatically shifts time series
-                % to fill the initial input and layer delay states.
-            else
-                X = XX;
-                Xi = [];
-            end
-            
+            [X,Xi,Ai] = preparets(AE.DeeperNet,XX); % This function simplifies the task of
+            % reformatting input and target time series.
+            % It automatically shifts time series
+            % to fill the initial input and layer delay states.
             
             % Dimensions
             TS = size(X,2); % timesteps
@@ -402,103 +404,69 @@ classdef AutoEncoder_DR < handle
             % decoder bias and weights
             bias_2 = AE.DeeperNet.b{2};
             LW_2_1 =  AE.DeeperNet.LW{2,1};
+            bias_3 = AE.DeeperNet.b{3};
+            LW_3_2 =  AE.DeeperNet.LW{3,2};
             
-            if strcmp(op_type,'encode') % when used for encoding
-                
-                % preprocessing settings
-                preproc.ymin = AE.DeeperNet.inputs{1}.processSettings{1}.ymin;
-                preproc.gain = AE.DeeperNet.inputs{1}.processSettings{1}.gain;
-                preproc.xoffset = AE.DeeperNet.inputs{1}.processSettings{1}.xoffset;
-                
-            elseif strcmp(op_type,'decode') % when using for decoding
-                
-                % postprocessing settings
-                postproc.gain = AE.DeeperNet.output.processSettings{1}.gain;
-                postproc.xoffset = AE.DeeperNet.output.processSettings{1}.xoffset;
-                postproc.ymin = AE.DeeperNet.output.processSettings{1}.ymin;
-                
-            end
+            % Layer Delay States
+            Ad1 = [Ai(1,:) cell(1,1)];
+            Ad2 = [Ai(2,:) cell(1,1)];
+            Ad3 = [Ai(3,:) cell(1,1)];
             
-            highestDelay = AE.DeeperNet.inputWeights{1}.delays(end);
+            highestDelay = timeDelays(end);
             
+            % Allocate Outputs
+            output = cell(1,TS);
             
-            if highestDelay == 0 %%%%% case with no delays %%%%%%
-                for ts=1:TS
-                    if strcmp(op_type,'encode') % when used for encoding
-                        % Input 1 of netObj.encoder
-                        Xp1 = mapminmax_apply(X{1,ts},preproc);
-                        
-                        % Layer 1 of netObj.encoder
-                        if strcmp(AE.DeeperNet.layers{1}.transferFcn,'radbas')
-                            output{1,ts} = radbas_apply(repmat(bias_1,1,Q) + IW_1_1*Xp1); % features
-                        elseif strcmp(AE.DeeperNet.layers{1}.transferFcn,'logsig')
-                            output{1,ts} = logsig_apply(repmat(bias_1,1,Q) + IW_1_1*Xp1);
-                        end
-                    elseif strcmp(op_type,'decode') % when using for decoding
-                        % Layer 2 of netObj.decoder
-                        a2 = repmat(bias_2,1,Q) + LW_2_1*X{ts};
-                        % Output 1 of netObj.decoder
-                        output{1,ts} = mapminmax_reverse(a2,postproc); % predicted X
-                    end
-                end % time loop
+            % Time loop
+            for ts=1:TS
                 
-            else %%%%% case with delays %%%%%%
-                if strcmp(op_type,'encode')
-                    Xd1 = cell(1,highestDelay+1);
-                    for n=1:highestDelay
-                        Xd1{n} = mapminmax_apply(Xi{1,n},preproc);
-                    end
-                end
-                
-                % Allocate Outputs
-                output = cell(1,TS);
-                
-                % Time loop
-                for ts=1:TS
-                    
-                    if strcmp(op_type,'encode') % when used for encoding
-                        
-                        % Rotating delay state position
-                        xdts = mod(ts+highestDelay-1,highestDelay+1)+1;
-                        
-                        % Input 1 of netObj.encoder
-                        Xd1{xdts} = mapminmax_apply(X{1,ts},preproc);
-                        
-                        % Layer 1 of netObj.encoder
-                        tapdelay1 = cat(1,Xd1{mod(xdts-AE.DeeperNet.inputWeights{1,1}.delays-1,xdts)+1});
-                        
-                        if strcmp(AE.DeeperNet.layers{1}.transferFcn,'radbas')
-                            output{1,ts} = radbas_apply(repmat(bias_1,1,Q) + IW_1_1*tapdelay1);
-                        elseif strcmp(AE.DeeperNet.layers{1}.transferFcn,'logsig')
-                            output{1,ts} = logsig_apply(repmat(bias_1,1,Q) + IW_1_1*tapdelay1);
-                        end
-                        
-                    elseif strcmp(op_type,'decode') % when using for decoding
-                        
-                        % Layer 2
-                        a2 = repmat(bias_2,1,Q) + LW_2_1*X{ts};
-                        
-                        % Output 1
-                        output{1,ts} = mapminmax_reverse(a2,postproc);
-                        
-                    end
-                end % time loop
-               
-                % Final Delay States
-                finalxts = TS+(1: highestDelay);
-                xits = finalxts(finalxts<=highestDelay);
-                xts = finalxts(finalxts>highestDelay)-highestDelay;
                 if strcmp(op_type,'encode') % when used for encoding
-                    Xf = [Xi(:,xits) X(:,xts)];
-                    Af = cell(2,0);
+                    
+
+                    
+                    % Layer 1 of netObj.encoder
+                    if strcmp(AE.DeeperNet.layers{1}.transferFcn,'radbas')
+                        output{1,ts} = radbas_apply(repmat(bias_1,1,Q) + IW_1_1*X{1,ts});
+                    elseif strcmp(AE.DeeperNet.layers{1}.transferFcn,'logsig')
+                        output{1,ts} = logsig_apply(repmat(bias_1,1,Q) + IW_1_1*X{1,ts});
+                    elseif strcmp(AE.DeeperNet.layers{1}.transferFcn,'tansig')
+                        output{1,ts} = tansig_apply(repmat(bias_1,1,Q) + IW_1_1*X{1,ts});
+                    end
+                    
+                elseif strcmp(op_type,'decode') % when using for decoding
+                    
+                    % Rotating delay state position
+                    adts = mod(ts+highestDelay-1,highestDelay+1)+1;
+                    
+                    % Layer 2
+                    Ad1{adts} = X{1,ts};
+                    tapdelay1 = cat(1,Ad1{mod(adts-0-1,highestDelay+1)+1});
+                    Ad2{adts} = repmat(bias_2,1,Q) + LW_2_1*tapdelay1;
+                    
+                    % Layer 3
+                    tapdelay1 = cat(1,Ad2{mod(adts-timeDelays-1,highestDelay+1)+1});
+                    Ad3{adts} = repmat(bias_3,1,Q) + LW_3_2*tapdelay1;
+                    
+                    % Output 1
+                    output{1,ts} = Ad3{adts};
+                    
                 end
-                
-            end
+            end % time loop
+            
+            % Final Delay States
+            finalats = TS+(1: highestDelay);
+            ats = mod(finalats-1,highestDelay+1)+1;
+            Xf = cell(1,0);
+            Af = cell(3,highestDelay);
+            Af(1,:) = Ad1(:,ats);
+            Af(2,:) = Ad2(:,ats);
+            Af(3,:) = Ad3(:,ats);
+            
 
             % Format Output Arguments
             output = cell2mat(output);
             
-                        % check for autocorrelation in features using lbqtest
+            % check for autocorrelation in features using lbqtest
             if strcmp(op_type,'encode') % when used for encoding
                 nrFeature = size(output,1);
                 AE.AutoCorrFlag = zeros(nrFeature,8);
@@ -511,21 +479,7 @@ classdef AutoEncoder_DR < handle
                 end
             end
             
-            %%% USEFUL FUNCTION 
-            
-            % Map Minimum and Maximum Input Processing Function
-            function y = mapminmax_apply(x,settings)
-                y = bsxfun(@minus,x,settings.xoffset);
-                y = bsxfun(@times,y,settings.gain);
-                y = bsxfun(@plus,y,settings.ymin);
-            end
-            
-            % Map Minimum and Maximum Output Reverse-Processing Function
-            function x = mapminmax_reverse(y,settings)
-                x = bsxfun(@minus,y,settings.ymin);
-                x = bsxfun(@rdivide,x,settings.gain);
-                x = bsxfun(@plus,x,settings.xoffset);
-            end
+            %%% USEFUL FUNCTION
             
             % Radial Basis Transfer Function
             function a = radbas_apply(n,~)
@@ -535,6 +489,11 @@ classdef AutoEncoder_DR < handle
             function a = logsig_apply(n,~)
                 a = 1 ./ (1 + exp(-n));
             end
+            % Sigmoid Symmetric Transfer Function
+            function a = tansig_apply(n,~)
+                a = 2 ./ (1 + exp(-2*n)) - 1;
+            end
+            
         end %EncDecWdelays_f
         
     end % methods

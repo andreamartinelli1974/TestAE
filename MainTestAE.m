@@ -49,7 +49,7 @@ for ii = 1:numtest
     
     
     if ii == 1
-        DAA_params.AEafterResampling =  false(1);
+        DAA_params.AEafterResampling = false(1);
     else
         DAA_params.AEafterResampling = true(1);
     end

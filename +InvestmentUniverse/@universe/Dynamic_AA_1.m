@@ -251,10 +251,10 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                     startPrior = t-DAA_params.Priori_MovWin;
                 end
 
-                TrainigSet = U.AllInvariants.X(startPrior:t,:);
+                TrainingSet = U.AllInvariants.X(startPrior:t,:);
                 AEparams = DAA_params.AEparams;
 
-                AutoEncoder = AutoEncoder_DR(TrainigSet', AEparams);
+                AutoEncoder = AutoEncoder_DR(TrainingSet', AEparams);
                 
             end
             
@@ -553,14 +553,14 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         if DAA_params.UseAutoEncoder == false
                             DataSet4Modeling = X;
                         else
-                            TrainigSet = X';
+                            TrainingSet = X';
                             
-                            AutoEncoder.parametersSpotCheck(TrainigSet);
+                            AutoEncoder.parametersSpotCheck(TrainingSet);
                             
-                            AutoEncoder.SetNet(TrainigSet);
+                            AutoEncoder.SetNet(TrainingSet);
                             
                             
-                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainigSet,'encode')';
+                            DataSet4Modeling = AutoEncoder.EncDecFunction(TrainingSet,'encode')';
                         end
                             % *********************************************************
                         % modelling invariants based on a semiparametric approach
