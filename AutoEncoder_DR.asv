@@ -196,7 +196,7 @@ classdef AutoEncoder_DR < handle
                 Target = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets end eventually the squared returns
             end
             
-            [optimalParameters,optimalPerformance] =  AE.parametersSC(AE.DeeperNet,TrainingSet,Target);
+            [optimalParameters,optimalPerformance] = parametersSpotCheck(AE.DeeperNet,TrainingSet,Target);
             AE.OptimalPerformance = optimalPerformance;
             AE.OptimalParameters = optimalParameters;
 
@@ -524,7 +524,7 @@ classdef AutoEncoder_DR < handle
         end
         
         
-        function [optimalParameters,optimalPerformance] = parametersSC(net,XX,targets)
+        function [optimalParameters,optimalPerformance] = parametersSpotCheck(net,XX,targets)
             % The purpose of this function is to spotcheck several parameters
             % combinations for the neural network in 'net'
             % This function is called by EncodedTimeSeriesExample_WithDelays.mlx (see
