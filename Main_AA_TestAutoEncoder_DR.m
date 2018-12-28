@@ -185,7 +185,7 @@ AutoEncoder = AutoEncoder_DR(trainingset, AEparams);
 
 % Test the Network
 disp('test the net')
-X_hat = AutoEncoder.DeeperNet(XX);
+X_hat = AutoEncoder.Net.DeeperNet(XX);
 
 X_hat = cell2mat(X_hat);
 figure;
@@ -225,9 +225,9 @@ disp('set the final net')
 AutoEncoder.SetNet(trainingset);
 
 %test the Network
-X_hat = AutoEncoder.DeeperNet(XX);
+X_hat = AutoEncoder.Net.DeeperNet(XX);
 e2 = gsubtract(targets,X_hat);
-perf2 = perform(AutoEncoder.DeeperNet,X_hat,targets) % assess performance
+perf2 = perform(AutoEncoder.Net.DeeperNet,X_hat,targets) % assess performance
 
 % ************ Training, Validation and Test sets Performance *************
 
