@@ -88,7 +88,7 @@ classdef AutoEncoder_DR < handle
             AE.Net.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
             
-            [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai,'useParallel','yes','showResources','yes');
+            [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
             
             AE.OUT4Debug.AutoEncoder_DR.tr = tr;
             
@@ -416,7 +416,7 @@ classdef AutoEncoder_DR < handle
             elseif strcmp(net.performFcn,'mse') | strcmp(net.performFcn,'sse') % WHEN USING 'mse' Loss Function
                 
                 % TOOD: parametrize and provide as an input
-                regularization = [10e-7:10e-3:0.2];
+                regularization = [10e-7:3*10e-3:0.6];
                 nL = numel(regularization);
                 testedParameters = [];
                 performanceLog = [];
