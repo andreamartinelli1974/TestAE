@@ -73,6 +73,7 @@ classdef AutoEncoder_DR < handle
                 Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
             end
             
+                         
             % first layer
             AE.Seed{1} = trainAutoencoder(TrainingSet1, AE.InputParams.HiddenSize,...
                 'EncoderTransferFunction','logsig',...
@@ -81,7 +82,8 @@ classdef AutoEncoder_DR < handle
                 'SparsityRegularization', 1,...
                 'SparsityProportion', 0.4,...
                 'ShowProgressWindow',AE.SeeNNtraining,...
-                'ScaleData', false);
+                'ScaleData', false, ...
+                'MaxEpochs', 1); % don't really need to train (simply build the initial structure)
             
             TrainingSet2 = encode(AE.Seed{1},TrainingSet1);
             if AE.InputParams.SquareRet
@@ -98,12 +100,13 @@ classdef AutoEncoder_DR < handle
                 'SparsityRegularization', 1,...
                 'SparsityProportion', 0.4,...
                 'ShowProgressWindow',AE.SeeNNtraining,...
-                'ScaleData', false);
+                'ScaleData', false, ...
+                'MaxEpochs', 1); % don't really need to train (simply build the initial structure)
             
             TrainingSet3 = encode(AE.Seed{2},TrainingSet2);
             
             % third layer
-            AE.Seed{3} = trainSoftmaxLayer(TrainingSet3,Target,'LossFunction','crossentropy');
+            AE.Seed{3} = trainSoftmaxLayer(TrainingSet3,Target,'LossFunction','crossentropy','MaxEpochs', 1); % don't really need to train (simply build the initial structure)
             
             % b) creates the net from the native autoencoder and set a
             % series of parameters:
@@ -140,6 +143,12 @@ classdef AutoEncoder_DR < handle
             
             % net1.trainFcn = 'trainscg'; % use with msesparse
             AE.DeeperNet.trainFcn = AE.InputParams.trainFcn; % use with mse
+            % *** tmp
+            AE.DeeperNet.trainParam.showCommandLine = true(1);
+            AE.DeeperNet.trainParam.delta0 = 0.00005;
+            AE.DeeperNet.trainParam.min_grad = 1e-6;
+            AE.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
+                    'plotregression', 'plotfit'};
             
             % When working with timeseries in Matlab Neural Network it is better to use timeseries in cell array form,
             % where each cell corresponds to a point in time. Each cell can contain more than one observed feature wrt the
@@ -151,6 +160,7 @@ classdef AutoEncoder_DR < handle
             [Xs,Xi,Ai] = preparets(AE.DeeperNet,AE.TrainingSet);
             
             [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
+            AE.OUT4Debug.SetNet.tr = tr; % if no spot check is performed this struct will be kept
             
             AE.OUT4Debug.AutoEncoder_DR.tr = tr;
             
@@ -159,6 +169,10 @@ classdef AutoEncoder_DR < handle
             end
             AE.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
+                                 
+            % if no spot check has to take place these values will be kept                     
+            AE.OptimalPerformance = NaN;
+            AE.OptimalParameters = 0;                     
         end % AutoEncoder_DR
         
         function parametersSpotCheck(AE,TrainingSet)
@@ -167,7 +181,7 @@ classdef AutoEncoder_DR < handle
             % This function is called by EncodedTimeSeriesExample_WithDelays.mlx (see
             % comments in there for more details)
             
-            % The batterys of test performed below is differentiated depending on
+            % The batteries of test performed below is differentiated depending on
             % whether the 'mse' or 'msesparse' Loss Function is used, since they have
             % different parameters
             
@@ -332,8 +346,11 @@ classdef AutoEncoder_DR < handle
             AE.DeeperNet = configure(AE.DeeperNet,AE.TrainingSet,AE.Targets);
             
             AE.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
-            AE.DeeperNet.trainParam.max_fail = 10;
-            AE.DeeperNet.trainParam.mu_max = 1.00e+50;
+            AE.DeeperNet.trainParam.max_fail = 6;
+            if strcmp(AE.DeeperNet.trainFcn,'trainlm')
+                AE.DeeperNet.trainParam.mu_max = 1.00e+50;
+            end
+            AE.DeeperNet.trainParam.min_grad = 1e-6;
             AE.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
             AE.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
@@ -350,7 +367,7 @@ classdef AutoEncoder_DR < handle
             
             % ****  TRAIN *****
             [Xs,Xi,Ai] = preparets(AE.DeeperNet,AE.TrainingSet);
-            [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,Xi,Ai);%,'useParallel','yes','reduction',2);
+            [AE.DeeperNet,tr] = train(AE.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);%,'useParallel','yes','reduction',2);
             
             AE.OUT4Debug.SetNet.tr = tr;
             
@@ -575,7 +592,7 @@ classdef AutoEncoder_DR < handle
                             % from net
                             net1 = configure(net,XX,targets);
                             
-                            net1.trainParam.epochs = 2000;
+                            net1.trainParam.epochs = 1000;
                             net1.trainParam.max_fail = 6;
                             net1.trainParam.showWindow = false(1);
                             
@@ -604,7 +621,7 @@ classdef AutoEncoder_DR < handle
             elseif strcmp(net.performFcn,'mse') | strcmp(net.performFcn,'sse') % WHEN USING 'mse' Loss Function
                 
                 % TOOD: parametrize and provide as an input
-                regularization = [10e-7:10e-3:0.2];
+                regularization = [10e-7:2*10e-3:0.15];
                 nL = numel(regularization);
                 testedParameters = [];
                 performanceLog = [];
@@ -615,8 +632,8 @@ classdef AutoEncoder_DR < handle
                     % from net
                     net1 = configure(net,XX,targets);
                     
-                    net1.trainParam.epochs = 2000;
-                    net1.trainParam.max_fail = 8;
+                    net1.trainParam.epochs = 1000;
+                    net1.trainParam.max_fail = 6;
                     %net1.trainParam.showWindow = false(1);
                     
                     % set the parameters for the current loop

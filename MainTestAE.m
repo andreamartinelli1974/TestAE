@@ -14,7 +14,7 @@ addpath(['C:\Users\' userId '\Documents\GitHub\Utilities\'], ...
     ['C:\Users\' userId '\Documents\GitHub\AA_Project\AssetAllocation\FigExport\'], ...
     ['C:\Users\' userId '\Documents\GitHub\ReportsMgmt']);
 
-datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
+datapath = 'D:\encoderData\'; % 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
 load([datapath,'DAA_paramsTEST'])
@@ -24,8 +24,7 @@ AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);
 
 %% getting some 'names' needed for output purposes
-
-DAA_params.RiskBudgeting = false(1);  
+DAA_params.RiskBudgeting = false(1);
 DAA_params.riskAnalysisFlag = 0;
 
 % BackTest outputs to Excel
@@ -44,7 +43,6 @@ else
 end
 
 numtest = 2;
-
 for ii = 1:numtest
     
     
@@ -54,76 +52,79 @@ for ii = 1:numtest
         DAA_params.AEafterResampling = true(1);
     end
     
-    AEparams.HiddenSize = 5;
+    AEparams.spotCheck = false; % true % to perform params spotchecking or not
+    AEparams.HiddenSize = 40;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
-    AEparams.MaxEpoch = 2500;
+    AEparams.MaxEpoch = 1000;
     AEparams.ScaleData = false; % true;
-    AEparams.divideFcn = 'dividerand'; % Divide data randomly
+    AEparams.divideFcn = 'divideblock'; % 'dividerand'; % Divide data randomly
     AEparams.divideMode = 'time'; % 'sample';
     AEparams.divideParam.trainRatio = 70/100;
     AEparams.divideParam.valRatio = 15/100;
     AEparams.divideParam.testRatio = 15/100;
     AEparams.Delays = [0 1 2 3];
     AEparams.LossFcn = 'mse'; % 'sse'; % 'msesparse'; % Loss function used to train the net
-    AEparams.trainFcn = 'trainlm'; % 'trainrp'; % use with mse / sse
+    AEparams.trainFcn = 'trainrp'; %'trainscg'; %'trainlm'; %  use with mse / sse
     % v.trainFcn = 'trainscg'; % use with msesparse
     AEparams.SquareRet =  true(1); % false(1); %  use also the suared returns in input to catch vola autoreg
     
     DAA_params.AEparams = AEparams;
     
     DAA_params.ARMAGARCH = 0;
-    DAA_params.Priori_MovWin = 400;
-    %DAA_params.MinFreqOfPriorUpdate = 10;   
+    DAA_params.Priori_MovWin = 1000;
+    DAA_params.MinFreqOfPriorUpdate = 20;   % GP
     
     DAA_params.UseAutoEncoder = true;
-    Universe_1.Dynamic_AA_1(DAA_params,[]);
     
-    Universe_1.Debug.AE.WITH.AEparams= AEparams;
-    AEdataWITH(ii) = Universe_1.Debug.AE.WITH;
+        Universe_1.Dynamic_AA_1(DAA_params,[]);
+        
+        
+        Universe_1.Debug.AE.WITH.AEparams= AEparams;
+        AEdataWITH(ii) = Universe_1.Debug.AE.WITH;
+        
+        close all
+        import OutputsMgmt.*;
+        
+        BT_params.targetType =  'level';
+        % BT_params.target =  [0.0 inf];
+        BT_params.target =  [0.002 0.004];
+        
+        BT_params.targetName = ['Risk']; % ['ExpectedReturn']; %
+        BT_params.FixRebalThreshold = Inf; %0.10; % size of the outbalance for a single asset to be considered for the purpose of rebalancing
+        BT_params.FixedRebalCost_pct = 0.00001; % fixed % rebal cost0
+        BT_params.MinOutW_Assets = 10; % min no of assets that need to be rebalanced
+        BT_params.VolaAndES_window = 100; % rolling window used to compute moving std and ES for the portfolio equity line
+        Universe_1.AA_BackTest(['Dynamic_AA_1'],BT_params);
+        
+        % BackTest outputs to Excel
+        if DAA_params.QuantSignals
+            qS_string = ' - with Algo Signals';
+        else
+            qS_string = '';
+        end
+        
+        Label4Output = [DAA_params.SetUpName,' in ',optimSpace,' Target: ',BT_params.targetName,' Hiddensize=',num2str(AEparams.HiddenSize),' - selected range = ',num2str(BT_params.target(1)*100),'% - ',num2str(BT_params.target(2)*100),'%'];
+        
+        clear outputs;
+        
+        outputs = AA_Outputs(Universe_1,BT_params,['Dynamic_AA_1']);
+        outputs.GetAllocationsHistory;
+        outputs.GetReturnAndRiskMetrics(10);
+        
+        reportFileName = [DAA_params.SetUpName,'_AE_',datestr(date,'yyyymmdd')];
+        
+        outputs.ExcelOutput('Report1',reportFileName,Label4Output,DAA_params.ReportDir);
+        
+        close all
+    end % for
     
-    close all
-    import OutputsMgmt.*;
-    
-    BT_params.targetType =  'level';
-    % BT_params.target =  [0.0 inf];
-    BT_params.target =  [0.002 0.004];
-    
-    BT_params.targetName = ['Risk']; % ['ExpectedReturn']; % 
-    BT_params.FixRebalThreshold = Inf; %0.10; % size of the outbalance for a single asset to be considered for the purpose of rebalancing
-    BT_params.FixedRebalCost_pct = 0.00001; % fixed % rebal cost0
-    BT_params.MinOutW_Assets = 10; % min no of assets that need to be rebalanced
-    BT_params.VolaAndES_window = 100; % rolling window used to compute moving std and ES for the portfolio equity line
-    Universe_1.AA_BackTest(['Dynamic_AA_1'],BT_params);
-    
-    % BackTest outputs to Excel
-    if DAA_params.QuantSignals
-        qS_string = ' - with Algo Signals';
-    else
-        qS_string = '';
-    end
-    
-    Label4Output = [DAA_params.SetUpName,' in ',optimSpace,' Target: ',BT_params.targetName,' Hiddensize=',num2str(AEparams.HiddenSize),' - selected range = ',num2str(BT_params.target(1)*100),'% - ',num2str(BT_params.target(2)*100),'%'];
-    
-    clear outputs;
-    
-    outputs = AA_Outputs(Universe_1,BT_params,['Dynamic_AA_1']);
-    outputs.GetAllocationsHistory;
-    outputs.GetReturnAndRiskMetrics(10);
-    
-    reportFileName = [DAA_params.SetUpName,'_AE_',datestr(date,'yyyymmdd')];
-    
-    outputs.ExcelOutput('Report1',reportFileName,Label4Output,DAA_params.ReportDir);
-    
-    close all
-end % for
-
-save([datapath,'AEdataWITH',datestr(date,'yyyymmdd')],'AEdataWITH','-v7.3');
+    save([datapath,'AEdataWITH',datestr(date,'yyyymmdd')],'AEdataWITH','-v7.3');
 
 %%
-
-DAA_params.ARMAGARCH = 1;
+        
+DAA_params.ARMAGARCH = 0;
 DAA_params.UseAutoEncoder = false;
 Universe_1.Dynamic_AA_1(DAA_params,[]);
 
@@ -139,6 +140,7 @@ elseif strcmp(BT_params.targetType,'quantile')
     Label4Output = [DAA_params.SetUpName,' in ',optimSpace,' Target (BASED ON FIXED SELECTED QUANTILE): selected measure: ',BT_params.targetName,' - selected quantile = ',num2str(BT_params.target(1)),'%'];
 end
 
+import OutputsMgmt.*;
 clear outputs;
 outputs = AA_Outputs(Universe_1,BT_params,['Dynamic_AA_1']);
 outputs.GetAllocationsHistory;
@@ -148,6 +150,5 @@ reportFileName = [DAA_params.SetUpName,'_AE_',datestr(date,'yyyymmdd')];
 
 outputs.ExcelOutput('Report1',reportFileName,Label4Output,DAA_params.ReportDir);
 
-close all    
-    
-    
+close all
+

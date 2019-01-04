@@ -881,7 +881,6 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                             X_Projected = sum(X_Resampled,3);
                         end
                         
-                        % GP changes
                         if DAA_params.UseAutoEncoder == true && DAA_params.AEafterResampling
                            
                             [tt,invariantsNo] = size(X); 
