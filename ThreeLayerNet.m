@@ -8,7 +8,7 @@ classdef ThreeLayerNet < handle
     % encoder/decoder function
     
     properties (Constant)
-        SeeNNtraining =   true(1); % false(1); % to see or not to see the nntraintool
+        SeeNNtraining = false(1); % true(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
@@ -51,7 +51,8 @@ classdef ThreeLayerNet < handle
                 'SparsityRegularization', 1,...
                 'SparsityProportion', 0.4,...
                 'ShowProgressWindow',Obj.SeeNNtraining,...
-                'ScaleData', false);
+                'ScaleData', false,...
+                'MaxEpoch', 1);
             
             TrainingSet2 = encode(Obj.Seed{1},TrainingSet1);
             if Obj.InputParams.SquareRet
@@ -68,12 +69,14 @@ classdef ThreeLayerNet < handle
                 'SparsityRegularization', 1,...
                 'SparsityProportion', 0.4,...
                 'ShowProgressWindow',Obj.SeeNNtraining,...
-                'ScaleData', false);
+                'ScaleData', false,...
+                'MaxEpoch', 1);
             
             TrainingSet3 = encode(Obj.Seed{2},TrainingSet2);
             
             % third layer
-            Obj.Seed{3} = trainSoftmaxLayer(TrainingSet3,Target,'LossFunction','crossentropy');
+            Obj.Seed{3} = trainSoftmaxLayer(TrainingSet3,Target,'LossFunction',...
+                          'crossentropy','ShowProgressWindow',Obj.SeeNNtraining,'MaxEpoch', 1);
             
             % b) creates the net from the native autoencoder and set a
             % series of parameters:

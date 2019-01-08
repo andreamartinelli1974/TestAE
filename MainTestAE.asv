@@ -18,7 +18,7 @@ datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
 load([datapath,'DAA_paramsEquity'])
-DAA_params.StartDay = '1/2/2018';
+DAA_params.StartDay = '1/4/2018';
 load([datapath,'UniverseEquity']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);
@@ -76,7 +76,6 @@ for ii = 1:numtest
     DAA_params.ARMAGARCH = 0;
     DAA_params.Priori_MovWin = 1000;
     DAA_params.MinFreqOfPriorUpdate = 20;   
-    DAA_params.UseSpotCheck = false;
     
     DAA_params.UseAutoEncoder = true;
     Universe_1.Dynamic_AA_1(DAA_params,[]);
