@@ -55,7 +55,7 @@ classdef AutoEncoder_DR < handle
         
         function AE = AutoEncoder_DR(TrainingSet1,InputParams) % constructor
            
-            disp('creating the net');
+            disp = 'create the net';
             
          
             % Call the cunstructor of the net:
@@ -88,8 +88,8 @@ classdef AutoEncoder_DR < handle
             
             AE.Net.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
-            AE.Net.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
-            AE.Net.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
+            DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
+            DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
             
             [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
             
@@ -124,7 +124,7 @@ classdef AutoEncoder_DR < handle
             % Each point can have a dimension higher than 1, as above (not necessarily
             % the same dimension as the elements of XX)
             
-            disp('performing the parameters spot check');
+            disp = 'performing the parameters spot check';
            
             
             if ~isempty(TrainingSet)
@@ -259,7 +259,7 @@ classdef AutoEncoder_DR < handle
         
         function SetNet(AE,TrainingSet)
             
-            disp('training the final net');
+            disp = 'train the final net';
             
             if ~isempty(TrainingSet)
                 if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
@@ -311,7 +311,7 @@ classdef AutoEncoder_DR < handle
         
         function [output,Xf,Af] = EncDecFunction(AE,InputX,op_type)
             
-            disp('Encoding or decoding');
+            disp = 'Encoding or decodi
             % this is a modified version of the function generated automatically by Matlab through
             % genFunction(net1,'testF'). It has been modified to parametrize some data
             % that are defined as constants in the Matlab version.
