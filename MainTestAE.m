@@ -56,7 +56,7 @@ for ii = 1:numtest
     
     AEparams.HiddenSize = 40;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
-    AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; %
+    AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; % 'tansig';
     AEparams.DecoderTransferFunction = 'purelin';
     AEparams.MaxEpoch = 2500;
     AEparams.ScaleData = false; % true;

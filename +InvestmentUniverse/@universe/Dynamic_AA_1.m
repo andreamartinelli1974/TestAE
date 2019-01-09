@@ -697,7 +697,9 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         close all
                         
                         if DAA_params.UseAutoEncoder == true && ~DAA_params.AEafterResampling
+                            [tt,invariantsNo] = size(X); 
                             X_simulated = AutoEncoder.EncDecFunction(X_simulated','decode')';
+                            X_simulated = X_simulated(:,1:invariantsNo);
                         end
                         
                         % ***** END OF TAILS CODEPENDENNCE MONITORING *****
@@ -882,12 +884,17 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                             X_Projected = sum(X_Resampled,3);
                         end
                         
+                        % GP changes
                         if DAA_params.UseAutoEncoder == true && DAA_params.AEafterResampling
                            
-                            [tt,invariants] = size(X); 
-                            X_res_final = zeros(DAA_params.ProjectionResampling_numsim,invariants,HorizonDays);
+                            [tt,invariantsNo] = size(X); 
+                            X_res_final = zeros(DAA_params.ProjectionResampling_numsim,invariantsNo,HorizonDays);
+                            maxDelay = AutoEncoder.InputParams.Delays(end);
+                            
                             for i = 1:size(X_Resampled,3)
-                                X_res_final(:,:,i) = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
+                                decodedData = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
+                                decodedData = decodedData(:,1:invariantsNo);
+                                X_res_final(maxDelay+1:end,:,i) = decodedData;
                             end
                             X_Resampled = X_res_final;
                             X_Projected = sum(X_Resampled,3);

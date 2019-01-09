@@ -218,8 +218,8 @@ end
 %% *********************    PARAMETERS SPOT-CHECK    **********************
 % this is basically a repetition of the step above, but with a fine tuning
 % of the network parameters (some of them) through parametersSpotCheck.m
-disp('spot-check')
-AutoEncoder.parametersSpotCheck(trainingset);
+% disp('spot-check')
+% AutoEncoder.parametersSpotCheck(trainingset);
 
 disp('set the final net')
 AutoEncoder.SetNet(trainingset);
