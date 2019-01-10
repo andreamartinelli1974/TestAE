@@ -35,7 +35,7 @@ classdef AutoEncoder_DR < handle
     % InputParams.SquareRet = true(1); % false(1) % use also the suared returns in input to catch vola autoreg
     
     properties (Constant)
-        SeeNNtraining =  false(1); %  true(1); % to see or not to see the nntraintool
+        SeeNNtraining =  true(1); % false(1); %  to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
@@ -89,7 +89,11 @@ classdef AutoEncoder_DR < handle
             AE.Net.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
             AE.Net.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
+            AE.Net.DeeperNet.trainParam.max_fail = 10;
             AE.Net.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
+            
+            [s1,s2] =  size(AE.Net.DeeperNet.LW{3,2});
+            AE.Net.DeeperNet.LW{3,2} = rand(s1,s2);
             
             [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
             
@@ -143,113 +147,114 @@ classdef AutoEncoder_DR < handle
                 Target = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets end eventually the squared returns
             end
             
-            [optimalParameters,optimalPerformance] =  AE.parametersSC(AE.Net.DeeperNet,TrainingSet,Target);
-            AE.OptimalPerformance = optimalPerformance;
-            AE.OptimalParameters = optimalParameters;
-
+            %             [optimalParameters,optimalPerformance] =  AE.parametersSC(AE.Net.DeeperNet,TrainingSet,Target);
+            %             AE.OptimalPerformance = optimalPerformance;
+            %             AE.OptimalParameters = optimalParameters;
             
-%             if strcmp(AE.Net.DeeperNet.performFcn,'msesparse')  % WHEN USING 'msesparse' Loss Function
-%                 
-%                 % TOOD: parametrize and provide as an input
-%                 % defining parameters combinations
-%                 sparsityRegularization = [0:0.2:2];
-%                 sparsity = [0.05:0.10:0.50];
-%                 L2WeightRegularization = [10e-7:10e-3:0.1];
-%                 
-%                 testedParameters = [];
-%                 performanceLog = [];
-%                 
-%                 ns = numel(sparsityRegularization);
-%                 ns1 = numel(sparsity);
-%                 nL = numel(L2WeightRegularization);
-%                 
-%                 checksTot = ns*ns1*nL;
-%                 
-%                 testedParameters = [];
-%                 performanceLog = [];
-%                 
-%                 % 3 nested loops to test all the parameters combinaations defined
-%                 % above
-%                 for s=1:ns
-%                     for s1=1:ns1
-%                         for L=1:nL
-%                             % initializes the weights matrices, while building net1
-%                             % from net
-%                             net1 = configure(AE.Net.DeeperNet,TrainingSet,Target);
-%                             
-%                             net1.trainParam.epochs = AE.InputParams.MaxEpoch;
-%                             net1.trainParam.max_fail = 8;
-%                             net1.trainParam.showWindow = AE.SeeNNtraining;
-%                             
-%                             % set the parameters for the current loop
-%                             net1.performParam.sparsityRegularization = sparsityRegularization(s);
-%                             net1.performParam.sparsity = sparsity(s1);
-%                             net1.performParam.L2WeightRegularization = L2WeightRegularization(L);
-%                             
-%                             % ****  TRAIN *****
-%                             [Xs,Xi,Ai] = preparets(net1,TrainingSet);
-%                             [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai,'useParallel','yes','reduction',2);
-%                             
-%                             AE.OUT4Debug.parametersSpotCheck.tr{L} = tr;
-%                             % nntraintool('close');
-%                             
-%                             % Test the Network
-%                             X_hat_2 = net1(TrainingSet);
-%                             testTargets = cell2mat(Targets) .* cell2mat(tr.testMask);
-%                             
-%                             testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
-%                             
-%                             testedParameters = [testedParameters;[sparsityRegularization(s),sparsity(s1),L2WeightRegularization(L)]];
-%                             performanceLog = [performanceLog;testPerformance];
-%                         end
-%                     end
-%                 end
-%                 
-%             elseif strcmp(AE.Net.DeeperNet.performFcn,'mse') || strcmp(AE.Net.DeeperNet.performFcn,'sse')  % WHEN USING 'mse' Loss Function
-%                 
-%                 % TOOD: parametrize and provide as an input
-%                 regularization = [10e-7:10e-3:0.2];
-%                 nL = numel(regularization);
-%                 testedParameters = [];
-%                 performanceLog = [];
-%                 
-%                 for L=1:nL
-%                     
-%                     % initializes the weights matrices, while building net1
-%                     % from net
-%                     net1 = configure(AE.Net.DeeperNet,TrainingSet,Target);
-%                     
-%                     net1.trainParam.epochs = AE.InputParams.MaxEpoch;
-%                     net1.trainParam.max_fail = 10;
-%                     net1.trainParam.mu_max = 1.00e+20;
-%                     net1.trainParam.showWindow = AE.SeeNNtraining;
-%                     
-%                     % set the parameters for the current loop
-%                     net1.performParam.regularization = regularization(L);
-%                     
-%                     % ****  TRAIN *****
-%                     [Xs,Xi,Ai] = preparets(net1,AE.TrainingSet);
-%                     [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai); %,'useParallel','yes','reduction',2);
-%                     
-%                     AE.OUT4Debug.parametersSpotCheck.tr{L} = tr;
-%                     % nntraintool('close');
-%                     
-%                     % Test the Network
-%                     X_hat_2 = net1(TrainingSet);
-%                     testTargets = cell2mat(Target) .* cell2mat(tr.testMask);
-%                     
-%                     testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
-%                     
-%                     testedParameters = [testedParameters;regularization(L)];
-%                     performanceLog = [performanceLog;testPerformance];
-%                     
-%                 end
-%             end
-%             
-%             % optimal parameters
-%             [mn,mni] = min(abs(performanceLog));
-%             AE.OptimalPerformance = performanceLog(mni);
-%             AE.OptimalParameters = testedParameters(mni,:);
+            epochs = 100;
+            max_fail = 50;
+            
+            if strcmp(AE.Net.DeeperNet.performFcn,'msesparse')  % WHEN USING 'msesparse' Loss Function
+                
+                % TOOD: parametrize and provide as an input
+                % defining parameters combinations
+                sparsityRegularization = [0:0.2:2];
+                sparsity = [0.05:0.10:0.50];
+                L2WeightRegularization = [10e-7:10e-3:0.1];
+                
+                testedParameters = [];
+                performanceLog = [];
+                
+                ns = numel(sparsityRegularization);
+                ns1 = numel(sparsity);
+                nL = numel(L2WeightRegularization);
+                
+                checksTot = ns*ns1*nL;
+                
+                testedParameters = [];
+                performanceLog = [];
+                
+                % 3 nested loops to test all the parameters combinaations defined
+                % above
+                for s=1:ns
+                    for s1=1:ns1
+                        for L=1:nL
+                            
+                            % initializes the weights matrices, while building net1
+                            % from net
+                            net1 = init(AE.Net.DeeperNet);
+                      
+                            net1.trainParam.epochs = epochs;
+                            net1.trainParam.max_fail = max_fail;
+                            net1.trainParam.showWindow = AE.SeeNNtraining;
+                            
+                            % set the parameters for the current loop
+                            net1.performParam.sparsityRegularization = sparsityRegularization(s);
+                            net1.performParam.sparsity = sparsity(s1);
+                            net1.performParam.L2WeightRegularization = L2WeightRegularization(L);
+                            
+                            % ****  TRAIN *****
+                            [Xs,Xi,Ai] = preparets(net1,TrainingSet);
+                            [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai,'useParallel','yes','reduction',2);
+                            
+                            AE.OUT4Debug.parametersSpotCheck.tr{L} = tr;
+                            % nntraintool('close');
+                            
+                            % Test the Network
+                            X_hat_2 = net1(TrainingSet);
+                            testTargets = cell2mat(Targets) .* cell2mat(tr.testMask);
+                            
+                            testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
+                            
+                            testedParameters = [testedParameters;[sparsityRegularization(s),sparsity(s1),L2WeightRegularization(L)]];
+                            performanceLog = [performanceLog;testPerformance];
+                        end
+                    end
+                end
+                
+            elseif strcmp(AE.Net.DeeperNet.performFcn,'mse') || strcmp(AE.Net.DeeperNet.performFcn,'sse')  % WHEN USING 'mse' Loss Function
+                
+                % TOOD: parametrize and provide as an input
+                regularization = [10e-7:10e-3:0.2];
+                nL = numel(regularization);
+                testedParameters = [];
+                performanceLog = [];
+                
+                for L=1:nL
+                    
+                    % initializes the weights matrices, while building net1
+                    net1 = init(AE.Net.DeeperNet);
+                    
+                    net1.trainParam.epochs = epochs;
+                    net1.trainParam.max_fail = max_fail;
+                    net1.trainParam.showWindow = AE.SeeNNtraining;
+                    
+                    % set the parameters for the current loop
+                    net1.performParam.regularization = regularization(L);
+                    
+                    % ****  TRAIN *****
+                    [Xs,Xi,Ai] = preparets(net1,AE.TrainingSet);
+                    [net1,tr] = train(net1,TrainingSet,Target,Xi,Ai); %,'useParallel','yes','reduction',2);
+                    
+                    AE.OUT4Debug.parametersSpotCheck.tr{L} = tr;
+                    % nntraintool('close');
+                    
+                    % Test the Network
+                    X_hat_2 = net1(TrainingSet);
+                    testTargets = cell2mat(Target) .* cell2mat(tr.testMask);
+                    
+                    testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
+                    
+                    testedParameters = [testedParameters;regularization(L)];
+                    performanceLog = [performanceLog;testPerformance];
+                    
+                end
+            end
+            
+            % optimal parameters
+            [mn,mni] = min(abs(performanceLog));
+            AE.OptimalPerformance = performanceLog(mni);
+            AE.OptimalParameters = testedParameters(mni,:);
 
             if AE.SeeNNtraining == true
                 nntraintool('close')
@@ -280,9 +285,8 @@ classdef AutoEncoder_DR < handle
             % from net
             AE.Net.DeeperNet = configure(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets);
             
-            AE.Net.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
-            AE.Net.DeeperNet.trainParam.max_fail = 10;
-            AE.Net.DeeperNet.trainParam.mu_max = 1.00e+50;
+            AE.Net.DeeperNet.trainParam.epochs = 100;
+            AE.Net.DeeperNet.trainParam.max_fail = 50;
             AE.Net.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
             AE.Net.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
@@ -349,126 +353,126 @@ classdef AutoEncoder_DR < handle
   
         
         
-        function [optimalParameters,optimalPerformance] = parametersSC(net,XX,targets)
-            % The purpose of this function is to spotcheck several parameters
-            % combinations for the neural network in 'net'
-            % This function is called by EncodedTimeSeriesExample_WithDelays.mlx (see
-            % comments in there for more details)
-            
-            % The batterys of test performed below is differentiated depending on
-            % whether the 'mse' or 'msesparse' Loss Function is used, since they have
-            % different parameters
-            
-            % INPUTS:
-            % -> net: NN object as defined in EncodedTimeSeriesExample_WithDelays
-            % -> XX: cell array of dimension [1xTime] representing a timeseries. Each cell
-            % (point in time) can contain several values (features), defining a
-            % timeseries of n-dimensional variables,
-            % -> targets: cell array of dimension [1xTime] representing a timeseries.
-            % Each point can have a dimension higher than 1, as above (not necessarily
-            % the same dimension as the elements of XX)
-            
-            
-            clear testPerformance testedParameters performanceLog;
-            
-            if strcmp(net.performFcn,'msesparse') % WHEN USING 'msesparse' Loss Function
-                
-                % TOOD: parametrize and provide as an input
-                % defining parameters combinations
-                sparsityRegularization = [0:0.2:2];
-                sparsity = [0.05:0.10:0.50];
-                L2WeightRegularization = [10e-7:10e-3:0.1];
-                
-                testedParameters = [];
-                performanceLog = [];
-                
-                ns = numel(sparsityRegularization);
-                ns1 = numel(sparsity);
-                nL = numel(L2WeightRegularization);
-                
-                checksTot = ns*ns1*nL;
-                
-                testedParameters = [];
-                performanceLog = [];
-                
-                % 3 nested loops to test all the parameters combinaations defined
-                % above
-                for s=1:ns
-                    for s1=1:ns1
-                        for L=1:nL
-                            % initializes the weights matrices, while building net1
-                            % from net
-                            net1 = configure(net,XX,targets);
-                            
-                            net1.trainParam.epochs = 2000;
-                            net1.trainParam.max_fail = 6;
-                            net1.trainParam.showWindow = false(1);
-                            
-                            % set the parameters for the current loop
-                            net1.performParam.sparsityRegularization = sparsityRegularization(s);
-                            net1.performParam.sparsity = sparsity(s1);
-                            net1.performParam.L2WeightRegularization = L2WeightRegularization(L);
-                            
-                            % ****  TRAIN *****
-                            [Xs,Xi,Ai] = preparets(net1,XX);
-                            [net1,tr] = train(net1,XX,targets,Xi,Ai);
-                            % nntraintool('close');
-                            
-                            % Test the Network
-                            X_hat_2 = net1(XX);
-                            testTargets = cell2mat(targets) .* cell2mat(tr.testMask);
-                            
-                            testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
-                            
-                            testedParameters = [testedParameters;[sparsityRegularization(s),sparsity(s1),L2WeightRegularization(L)]];
-                            performanceLog = [performanceLog;testPerformance];
-                        end
-                    end
-                end
-                
-            elseif strcmp(net.performFcn,'mse') | strcmp(net.performFcn,'sse') % WHEN USING 'mse' Loss Function
-                
-                % TOOD: parametrize and provide as an input
-                regularization = [10e-7:3*10e-3:0.6];
-                nL = numel(regularization);
-                testedParameters = [];
-                performanceLog = [];
-                
-                for L=1:nL
-                    
-                    % initializes the weights matrices, while building net1
-                    % from net
-                    net1 = configure(net,XX,targets);
-                    
-                    net1.trainParam.epochs = 2000;
-                    net1.trainParam.max_fail = 8;
-                    %net1.trainParam.showWindow = false(1);
-                    
-                    % set the parameters for the current loop
-                    net1.performParam.regularization = regularization(L);
-                    
-                    % ****  TRAIN *****
-                    [Xs,Xi,Ai] = preparets(net1,XX);
-                    [net1,tr] = train(net1,XX,targets,Xi,Ai);
-                    % nntraintool('close');
-                    
-                    % Test the Network
-                    X_hat_2 = net1(XX);
-                    testTargets = cell2mat(targets) .* cell2mat(tr.testMask);
-                    
-                    testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
-                    
-                    testedParameters = [testedParameters;regularization(L)];
-                    performanceLog = [performanceLog;testPerformance];
-                    
-                end
-            end
-            
-            % optimal parameters
-            [mn,mni] = min(abs(performanceLog));
-            optimalPerformance = performanceLog(mni);
-            optimalParameters = testedParameters(mni,:);
-        end
+%         function [optimalParameters,optimalPerformance] = parametersSC(net,XX,targets)
+%             % The purpose of this function is to spotcheck several parameters
+%             % combinations for the neural network in 'net'
+%             % This function is called by EncodedTimeSeriesExample_WithDelays.mlx (see
+%             % comments in there for more details)
+%             
+%             % The batterys of test performed below is differentiated depending on
+%             % whether the 'mse' or 'msesparse' Loss Function is used, since they have
+%             % different parameters
+%             
+%             % INPUTS:
+%             % -> net: NN object as defined in EncodedTimeSeriesExample_WithDelays
+%             % -> XX: cell array of dimension [1xTime] representing a timeseries. Each cell
+%             % (point in time) can contain several values (features), defining a
+%             % timeseries of n-dimensional variables,
+%             % -> targets: cell array of dimension [1xTime] representing a timeseries.
+%             % Each point can have a dimension higher than 1, as above (not necessarily
+%             % the same dimension as the elements of XX)
+%             
+%             
+%             clear testPerformance testedParameters performanceLog;
+%             
+%             if strcmp(net.performFcn,'msesparse') % WHEN USING 'msesparse' Loss Function
+%                 
+%                 % TOOD: parametrize and provide as an input
+%                 % defining parameters combinations
+%                 sparsityRegularization = [0:0.2:2];
+%                 sparsity = [0.05:0.10:0.50];
+%                 L2WeightRegularization = [10e-7:10e-3:0.1];
+%                 
+%                 testedParameters = [];
+%                 performanceLog = [];
+%                 
+%                 ns = numel(sparsityRegularization);
+%                 ns1 = numel(sparsity);
+%                 nL = numel(L2WeightRegularization);
+%                 
+%                 checksTot = ns*ns1*nL;
+%                 
+%                 testedParameters = [];
+%                 performanceLog = [];
+%                 
+%                 % 3 nested loops to test all the parameters combinaations defined
+%                 % above
+%                 for s=1:ns
+%                     for s1=1:ns1
+%                         for L=1:nL
+%                             % initializes the weights matrices, while building net1
+%                             % from net
+%                             net1 = configure(net,XX,targets);
+%                             
+%                             net1.trainParam.epochs = 2000;
+%                             net1.trainParam.max_fail = 6;
+%                             net1.trainParam.showWindow = false(1);
+%                             
+%                             % set the parameters for the current loop
+%                             net1.performParam.sparsityRegularization = sparsityRegularization(s);
+%                             net1.performParam.sparsity = sparsity(s1);
+%                             net1.performParam.L2WeightRegularization = L2WeightRegularization(L);
+%                             
+%                             % ****  TRAIN *****
+%                             [Xs,Xi,Ai] = preparets(net1,XX);
+%                             [net1,tr] = train(net1,XX,targets,Xi,Ai);
+%                             % nntraintool('close');
+%                             
+%                             % Test the Network
+%                             X_hat_2 = net1(XX);
+%                             testTargets = cell2mat(targets) .* cell2mat(tr.testMask);
+%                             
+%                             testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
+%                             
+%                             testedParameters = [testedParameters;[sparsityRegularization(s),sparsity(s1),L2WeightRegularization(L)]];
+%                             performanceLog = [performanceLog;testPerformance];
+%                         end
+%                     end
+%                 end
+%                 
+%             elseif strcmp(net.performFcn,'mse') | strcmp(net.performFcn,'sse') % WHEN USING 'mse' Loss Function
+%                 
+%                 % TOOD: parametrize and provide as an input
+%                 regularization = [10e-7:3*10e-3:0.6];
+%                 nL = numel(regularization);
+%                 testedParameters = [];
+%                 performanceLog = [];
+%                 
+%                 for L=1:nL
+%                     
+%                     % initializes the weights matrices, while building net1
+%                     % from net
+%                     net1 = configure(net,XX,targets);
+%                     
+%                     net1.trainParam.epochs = 2000;
+%                     net1.trainParam.max_fail = 8;
+%                     %net1.trainParam.showWindow = false(1);
+%                     
+%                     % set the parameters for the current loop
+%                     net1.performParam.regularization = regularization(L);
+%                     
+%                     % ****  TRAIN *****
+%                     [Xs,Xi,Ai] = preparets(net1,XX);
+%                     [net1,tr] = train(net1,XX,targets,Xi,Ai);
+%                     % nntraintool('close');
+%                     
+%                     % Test the Network
+%                     X_hat_2 = net1(XX);
+%                     testTargets = cell2mat(targets) .* cell2mat(tr.testMask);
+%                     
+%                     testPerformance = perform(net1,testTargets,cell2mat(X_hat_2)); % measure of performance used for selection
+%                     
+%                     testedParameters = [testedParameters;regularization(L)];
+%                     performanceLog = [performanceLog;testPerformance];
+%                     
+%                 end
+%             end
+%             
+%             % optimal parameters
+%             [mn,mni] = min(abs(performanceLog));
+%             optimalPerformance = performanceLog(mni);
+%             optimalParameters = testedParameters(mni,:);
+%         end
     end
     
 end % classdef

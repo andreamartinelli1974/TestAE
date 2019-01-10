@@ -8,7 +8,7 @@ classdef ThreeLayerNet < handle
     % encoder/decoder function
     
     properties (Constant)
-        SeeNNtraining = false(1); % true(1); % to see or not to see the nntraintool
+        SeeNNtraining = true(1); % false(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
@@ -206,8 +206,8 @@ classdef ThreeLayerNet < handle
                     Ad2{adts} = repmat(bias_2,1,Q) + LW_2_1*tapdelay1;
                     
                     % Layer 3
-                    tapdelay1 = cat(1,Ad2{mod(adts-timeDelays-1,highestDelay+1)+1});
-                    Ad3{adts} = repmat(bias_3,1,Q) + LW_3_2*tapdelay1;
+                    tapdelay2 = cat(1,Ad2{mod(adts-timeDelays-1,highestDelay+1)+1});
+                    Ad3{adts} = repmat(bias_3,1,Q) + LW_3_2*tapdelay2;
                     
                     % Output 1
                     output{1,ts} = Ad3{adts};

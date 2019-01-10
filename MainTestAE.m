@@ -18,7 +18,7 @@ datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
 load([datapath,'DAA_paramsEquity'])
-DAA_params.StartDay = '1/2/2018';
+DAA_params.StartDay = '6/2/2017';
 load([datapath,'UniverseEquity']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);

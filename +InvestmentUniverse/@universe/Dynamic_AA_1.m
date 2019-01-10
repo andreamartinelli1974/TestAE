@@ -555,13 +555,12 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                         else
                             TrainingSet = X';
                             
-                            if DAA_params.UseSpotCheck;
+                            if DAA_params.UseSpotCheck == 0;
                                 AutoEncoder.parametersSpotCheck(TrainingSet);
+                                AutoEncoder.SetNet(TrainingSet);
+                                DAA_params.UseSpotCheck = 1;
                             end
-                            
-                            AutoEncoder.SetNet(TrainingSet);
-                            
-                            
+       
                             DataSet4Modeling = AutoEncoder.EncDecFunction(TrainingSet,'encode')';
                         end
                             % *********************************************************
