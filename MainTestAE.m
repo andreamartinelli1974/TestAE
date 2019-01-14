@@ -49,14 +49,14 @@ for ii = 1:numtest
     
     
     if ii == 1
-        DAA_params.AEafterResampling = false(1);
-    else
         DAA_params.AEafterResampling = true(1);
+    else
+        DAA_params.AEafterResampling = false(1);
     end
     
     AEparams.HiddenSize = 40;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
-    AEparams.EncoderTransferFunction = 'logsig'; %  'radbas'; % 'tansig';
+    AEparams.EncoderTransferFunction = 'tansig'; % 'logsig'; %  'radbas'; % 
     AEparams.DecoderTransferFunction = 'purelin';
     AEparams.MaxEpoch = 2500;
     AEparams.ScaleData = false; % true;
@@ -75,7 +75,7 @@ for ii = 1:numtest
     
     DAA_params.ARMAGARCH = 0;
     DAA_params.Priori_MovWin = 1000;
-    DAA_params.MinFreqOfPriorUpdate = 20;   
+    DAA_params.MinFreqOfProrUpdate = 20;   
     DAA_params.UseSpotCheck = false;
     
     DAA_params.UseAutoEncoder = true;

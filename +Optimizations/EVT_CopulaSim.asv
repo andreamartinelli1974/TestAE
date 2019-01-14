@@ -253,9 +253,8 @@ classdef EVT_CopulaSim < handle
                     N_prev = N; % records the numerosity of the previous iteration tail
                 end % while t in ]0 1[
                 
-                % a min no of estimates in necessary for reliability
-                % and non constant values
-                if numel(shapeEstimates) < 3 || std(shapeEstimates) == 0
+                
+                if numel(shapeEstimates) < 3 || std(% a min no of estimates in necessary for reliability
                     t_opt.(T{1}) = noEstimVal;
                 else
                     

@@ -890,13 +890,22 @@ function Dynamic_AA_1(U,DAA_params,SubjectiveViews) %***************************
                             [tt,invariantsNo] = size(X); 
                             X_res_final = zeros(DAA_params.ProjectionResampling_numsim,invariantsNo,HorizonDays);
                             maxDelay = AutoEncoder.InputParams.Delays(end);
-
-                            for i = 1:size(X_Resampled,3)
-                                decodedData = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
-                                decodedData = decodedData(:,1:invariantsNo);
-                                X_res_final(maxDelay+1:end,:,i) = decodedData;
-                            end
                             
+                            [x,y,z] = size(X_Resampled);
+                            for i=1:z 
+                                testDecode((x*(i-1)+1):x*i,:) = X_Resampled(:,:,i); 
+                            end
+                            decodedData = AutoEncoder.EncDecFunction(testDecode','decode')';
+                            for i=1:z 
+                                X_res_final(maxDelay+1:end,:,i) = decodedData(:,(y*(i-1)+1):y*i);
+                            end
+                            X_res_final(maxDelay+1:end,:) = decodedData;
+                            
+%                             for i = 1:size(X_Resampled,3)
+%                                 decodedData = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
+%                                 decodedData = decodedData(:,1:invariantsNo);
+%                                 X_res_final(maxDelay+1:end,:,i) = decodedData;
+%                             end
                             X_Resampled = X_res_final;
                             X_Projected = sum(X_Resampled,3);
                             
