@@ -149,10 +149,9 @@ classdef AutoEncoder_DR < handle
             AE.Net.DeeperNet.trainParam.goal = 0;
             
            
-            AE.Net.DeeperNet.performParam.normalization = 'standard';
-            [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
-            
+            % AE.Net.DeeperNet.performParam.normalization = 'standard';
             AE.Net.DeeperNet.performParam.normalization = 'none';        
+            
             [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
             
             AE.PreviousRunWeights.IW = AE.Net.DeeperNet.IW;

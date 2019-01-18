@@ -54,7 +54,7 @@ for ii = 1:numtest
         DAA_params.AEafterResampling = false(1);
     end
     
-    AEparams.HiddenSize = 100;
+    AEparams.HiddenSize = 50;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'tansig'; % 'tansig'; % 'logsig'; %  'radbas'; % 
     AEparams.DecoderTransferFunction = 'purelin';
@@ -65,9 +65,9 @@ for ii = 1:numtest
     AEparams.divideParam.trainRatio = 60/100;
     AEparams.divideParam.valRatio = 30/100;
     AEparams.divideParam.testRatio = 10/100;
-    AEparams.Delays = [0 1 2]; % [0 1 2 3];
+    AEparams.Delays = [0 1]; % [0 1 2 3];
     AEparams.LossFcn = 'mse'; % 'sse'; % 'msesparse'; % Loss function used to train the net
-    AEparams.trainFcn = 'trainrp'; % 'trainlm'; %  use with mse / sse
+    AEparams.trainFcn = 'trains'; % 'trainlm'; %  use with mse / sse
     % v.trainFcn = 'trainscg'; % use with msesparse
     AEparams.SquareRet =  true(1); % false(1); %  use also the suared returns in input to catch vola autoreg
     AEparams.multFactor4NumericalStability = 1; % multiplicative factor used for numerical stability
