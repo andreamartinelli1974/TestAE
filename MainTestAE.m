@@ -159,6 +159,8 @@ elseif strcmp(BT_params.targetType,'quantile')
 end
 
 clear outputs;
+import OutputsMgmt.*;
+
 outputs = AA_Outputs(Universe_1,BT_params,['Dynamic_AA_1']);
 outputs.GetAllocationsHistory;
 outputs.GetReturnAndRiskMetrics(10);
