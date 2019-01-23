@@ -33,6 +33,9 @@ classdef AutoEncoder_DR < handle
     % InputParams.trainFcn = 'trainlm'; % used with mse
     % InputParams.trainFcn = 'trainscg'; % used with msesparse
     % InputParams.SquareRet = true(1); % false(1) % use also the suared returns in input to catch vola autoreg
+    % InputParams.multFactor4NumericalStability: this is used to scale the
+    % data set to improve numerical stability during training (e.g. if this
+    % parameter = 1000, than all data in the dataset are multiplied * 1000)
     
     properties (Constant)
         SeeNNtraining =  true(1); % false(1); %  to see or not to see the nntraintool
@@ -49,6 +52,8 @@ classdef AutoEncoder_DR < handle
        OptimalParameters = []; % Optimal parameters for thr net to be found with a spot check test
        OptimalPerformance = []; % performance of the net with optimal parameters from spot check test
        OUT4Debug = []; % for debugging and fine tuning purposes
+       PreviousRunWeights = []; % used to store the set of optimal weights (see notes below)
+       NormMetrics = []; % struct to host mean and std used to normalize data and then recats them into the original space
     end
     
     methods
@@ -57,32 +62,61 @@ classdef AutoEncoder_DR < handle
            
             disp('creating the net');
             
+            AE.NormMetrics.mu_X4AE = nanmean(TrainingSet1');
+            AE.NormMetrics.std_X4AE = nanstd(TrainingSet1');
+            normTrainingSet = bsxfun(@minus, TrainingSet1', AE.NormMetrics.mu_X4AE)';
+            normTrainingSet = bsxfun(@times, normTrainingSet', 1./AE.NormMetrics.std_X4AE)';
          
             % Call the cunstructor of the net:
-            AE.Net = ThreeLayerNet(TrainingSet1,InputParams);
+            AE.Net = ThreeLayerNet(normTrainingSet,InputParams);
             
             % import the net built
-            %AE.DeeperNet = AE.Net.DeeperNet; 
+            % * AE.DeeperNet = AE.Net.DeeperNet; 
             
             % When working with timeseries in Matlab Neural Network it is better to use timeseries in cell array form,
             % where each cell corresponds to a point in time. Each cell can contain more than one observed feature wrt the
             % time it refers to. See comments to the function matrixTs2CellTs
             
             AE.InputParams = InputParams;
+        end
+        
+        function TrainAE(AE,TrainingSet1)
             
+            
+                        
             if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
+                
+                
                 tmp = TrainingSet1(1:AE.InputParams.N_myFactors,:);
                 sqR = tmp.^2;
                 TrainingSet1 = [TrainingSet1(1:AE.InputParams.N_myFactors,:); sqR; TrainingSet1(AE.InputParams.N_myFactors+1:end,:)];
-                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
-                TsqR = Target.^2;
-                Target = [Target; TsqR];
+                
+                
+                AE.NormMetrics.mu_X4AE = nanmean(TrainingSet1');
+                AE.NormMetrics.std_X4AE = nanstd(TrainingSet1');
+                normTrainingSet = bsxfun(@minus, TrainingSet1', AE.NormMetrics.mu_X4AE)';
+                normTrainingSet = bsxfun(@times, normTrainingSet', 1./AE.NormMetrics.std_X4AE)';
+                
+                Target = normTrainingSet(1:AE.InputParams.N_myFactors*2,:);
+                
+                AE.NormMetrics.mu_X4AE_targets = AE.NormMetrics.mu_X4AE(1:AE.InputParams.N_myFactors*2);
+                AE.NormMetrics.std_X4AE_targets = AE.NormMetrics.std_X4AE(1:AE.InputParams.N_myFactors*2);
+                
             else
-                Target = TrainingSet1(1:AE.InputParams.N_myFactors,:);
+                
+                AE.NormMetrics.mu_X4AE = nanmean(TrainingSet1');
+                AE.NormMetrics.std_X4AE = nanstd(TrainingSet1');
+                normTrainingSet = bsxfun(@minus, TrainingSet1', AE.NormMetrics.mu_X4AE)';
+                normTrainingSet = bsxfun(@times, normTrainingSet', 1./AE.NormMetrics.std_X4AE)';
+                
+                Target = normTrainingSet(1:AE.InputParams.N_myFactors,:);
+                AE.NormMetrics.mu_X4AE_targets = AE.NormMetrics.mu_X4AE(1:AE.InputParams.N_myFactors);
+                AE.NormMetrics.std_X4AE_targets = AE.NormMetrics.std_X4AE(1:AE.InputParams.N_myFactors);
             end
             
-            AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet1);
-            AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets and eventually the squared returns    
+                        
+            AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability);
+            AE.Targets = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns    
             
             [Xs,Xi,Ai] = preparets(AE.Net.DeeperNet,AE.TrainingSet);
             
@@ -92,10 +126,38 @@ classdef AutoEncoder_DR < handle
             AE.Net.DeeperNet.trainParam.max_fail = 10;
             AE.Net.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
             
-            [s1,s2] =  size(AE.Net.DeeperNet.LW{3,2});
-            AE.Net.DeeperNet.LW{3,2} = rand(s1,s2);
+                
+            if isempty(AE.PreviousRunWeights) % GP
+                % prepare the network for weights intialization
+                AE.Net.DeeperNet.initFcn = 'initlay';
+                % using Nguyen-Widrow init function for all layers
+                AE.Net.DeeperNet.layers{1}.initFcn = 'initnw';
+                AE.Net.DeeperNet.layers{2}.initFcn = 'initnw';
+                AE.Net.DeeperNet.layers{3}.initFcn = 'initnw';
+                init(AE.Net.DeeperNet);
+            else % use previous weights
+                init(AE.Net.DeeperNet);
+                AE.Net.DeeperNet.IW = AE.PreviousRunWeights.IW;
+                AE.Net.DeeperNet.LW = AE.PreviousRunWeights.LW;
+                AE.Net.DeeperNet.b = AE.PreviousRunWeights.b;
+            end
+            AE.Net.DeeperNet.trainParam.delt_inc = 1.2;
+            AE.Net.DeeperNet.trainParam.delt_dec = 0.5;
+            AE.Net.DeeperNet.trainParam.min_grad = 1e-6;
+            AE.Net.DeeperNet.trainParam.delta0 = 1e-4;
+            AE.Net.DeeperNet.trainParam.deltamax = 10;
+            AE.Net.DeeperNet.trainParam.goal = 0;
             
+           
+            AE.Net.DeeperNet.performParam.normalization = 'standard';
             [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
+            
+            AE.Net.DeeperNet.performParam.normalization = 'none';        
+            [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,[],Ai);
+            
+            AE.PreviousRunWeights.IW = AE.Net.DeeperNet.IW;
+            AE.PreviousRunWeights.LW = AE.Net.DeeperNet.LW;
+            AE.PreviousRunWeights.b = AE.Net.DeeperNet.b;
             
             AE.OUT4Debug.AutoEncoder_DR.tr = tr;
             
@@ -143,8 +205,8 @@ classdef AutoEncoder_DR < handle
                     Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                 end
             
-                TrainingSet = AE.matrixTs2CellTs(TrainingSet);
-                Target = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets end eventually the squared returns
+                TrainingSet = AE.matrixTs2CellTs(TrainingSet.*AE.InputParams.multFactor4NumericalStability);
+                Target = AE.matrixTs2CellTs(Target.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets end eventually the squared returns
             end
             
             %             [optimalParameters,optimalPerformance] =  AE.parametersSC(AE.Net.DeeperNet,TrainingSet,Target);
@@ -277,8 +339,8 @@ classdef AutoEncoder_DR < handle
                 else
                     Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
                 end
-                AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet);
-                AE.Targets = AE.matrixTs2CellTs(Target); % I want only the initial N_myFactors as targets
+                AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet.*AE.InputParams.multFactor4NumericalStability);
+                AE.Targets = AE.matrixTs2CellTs(Target.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets
             end
             
             % initializes the weights matrices, while building net1
@@ -315,7 +377,7 @@ classdef AutoEncoder_DR < handle
         
         function [output,Xf,Af] = EncDecFunction(AE,InputX,op_type)
             
-            disp('Encoding or decoding');
+            % disp('Encoding or decoding');
             % this is a modified version of the function generated automatically by Matlab through
             % genFunction(net1,'testF'). It has been modified to parametrize some data
             % that are defined as constants in the Matlab version.
@@ -325,8 +387,42 @@ classdef AutoEncoder_DR < handle
             %%%%%%     to be encoded/decoded (n series x t timesteps)
             %%%%%% op_type: 'encode' or 'decode'
             
-            [output,Xf,Af] = AE.Net.EncDecFunction(InputX,op_type);
+            if strcmp(op_type,'encode')
+                if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
+                    tmp = InputX(1:AE.InputParams.N_myFactors,:);
+                    sqR = tmp.^2;
+                    InputX = [InputX(1:AE.InputParams.N_myFactors,:); sqR; InputX(AE.InputParams.N_myFactors+1:end,:)];
+                    
+                    AE.NormMetrics.mu_X4AE = nanmean(InputX');
+                    AE.NormMetrics.std_X4AE = nanstd(InputX');
+                    normDataSet = bsxfun(@minus, InputX', AE.NormMetrics.mu_X4AE)';
+                    normDataSet = bsxfun(@times, normDataSet', 1./AE.NormMetrics.std_X4AE)';
+                    
+                else
+                    
+                    AE.NormMetrics.mu_X4AE = nanmean(InputX');
+                    AE.NormMetrics.std_X4AE = nanstd(InputX');
+                    normDataSet = bsxfun(@minus, InputX', AE.NormMetrics.mu_X4AE)';
+                    normDataSet = bsxfun(@times, normDataSet', 1./AE.NormMetrics.std_X4AE)';
+                    
+                    AE.NormMetrics.mu_X4AE_targets = AE.NormMetrics.mu_X4AE(1:AE.InputParams.N_myFactors*2);
+                    AE.NormMetrics.std_X4AE_targets = AE.NormMetrics.std_X4AE(1:AE.InputParams.N_myFactors*2);
+                end
+            else
+                normDataSet = InputX;
+            end
+% %             normDataSet = bsxfun(@minus, InputX', AE.NormMetrics.mu_X4AE)';
+% %             normDataSet = bsxfun(@times, normDataSet', 1./AE.NormMetrics.std_X4AE)';
             
+            [output,Xf,Af] = AE.Net.EncDecFunction(normDataSet,op_type);
+            
+            if strcmp(op_type,'decode')
+                output = bsxfun(@times, output', AE.NormMetrics.std_X4AE_targets)';
+                output = bsxfun(@plus, output', AE.NormMetrics.mu_X4AE_targets)';
+            end
+            
+            
+% % %             [output,Xf,Af] = AE.Net.EncDecFunctionVectorized(InputX,op_type);
         end %EncDecFunction
         
     end % methods

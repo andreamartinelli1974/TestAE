@@ -14,7 +14,7 @@ addpath(['C:\Users\' userId '\Documents\GitHub\Utilities\'], ...
     ['C:\Users\' userId '\Documents\GitHub\AA_Project\AssetAllocation\FigExport\'], ...
     ['C:\Users\' userId '\Documents\GitHub\ReportsMgmt']);
 
-datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
+datapath = 'D:\encoderData\'; %  'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 
 import InvestmentUniverse.*;
 load([datapath,'DAA_paramsEquity'])
@@ -43,7 +43,7 @@ else
     end
 end
 
-numtest = 2;
+numtest = 1; % GP <===============
 
 for ii = 1:numtest
     
@@ -54,29 +54,47 @@ for ii = 1:numtest
         DAA_params.AEafterResampling = false(1);
     end
     
-    AEparams.HiddenSize = 40;
+    AEparams.HiddenSize = 100;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
-    AEparams.EncoderTransferFunction = 'tansig'; % 'logsig'; %  'radbas'; % 
+    AEparams.EncoderTransferFunction = 'tansig'; % 'tansig'; % 'logsig'; %  'radbas'; % 
     AEparams.DecoderTransferFunction = 'purelin';
     AEparams.MaxEpoch = 2500;
     AEparams.ScaleData = false; % true;
-    AEparams.divideFcn = 'dividerand'; % Divide data randomly
+    AEparams.divideFcn = 'divideblock'; % 'dividerand'; % Divide data randomly
     AEparams.divideMode = 'time'; % 'sample';
-    AEparams.divideParam.trainRatio = 70/100;
-    AEparams.divideParam.valRatio = 15/100;
-    AEparams.divideParam.testRatio = 15/100;
-    AEparams.Delays = [0 1 2 3];
+    AEparams.divideParam.trainRatio = 60/100;
+    AEparams.divideParam.valRatio = 30/100;
+    AEparams.divideParam.testRatio = 10/100;
+    AEparams.Delays = [0 1 2]; % [0 1 2 3];
     AEparams.LossFcn = 'mse'; % 'sse'; % 'msesparse'; % Loss function used to train the net
     AEparams.trainFcn = 'trainrp'; % 'trainlm'; %  use with mse / sse
     % v.trainFcn = 'trainscg'; % use with msesparse
     AEparams.SquareRet =  true(1); % false(1); %  use also the suared returns in input to catch vola autoreg
+    AEparams.multFactor4NumericalStability = 1; % multiplicative factor used for numerical stability
     
     DAA_params.AEparams = AEparams;
+    
+%     N = DAA_params.Priori_MovWin = 1000;
+%     stripLen = 20;
+%     done = false;
+%     while ~done
+%         trainTmp = unidrnd(N,1);
+%         train_ind = 
+%         
+%         valTmp = unidrnd(N-stripLen,1);
+%         testTmp = unidrnd(N,1);
+%         
+%         
+%     end
+    
     
     DAA_params.ARMAGARCH = 0;
     DAA_params.Priori_MovWin = 1000;
     DAA_params.MinFreqOfProrUpdate = 20;   
     DAA_params.UseSpotCheck = false;
+    
+    DAA_params.copula_NoSim = 10000;
+    DAA_params.ProjectionResampling_numsim = 9900;
     
     DAA_params.UseAutoEncoder = true;
     Universe_1.Dynamic_AA_1(DAA_params,[]);
@@ -89,7 +107,7 @@ for ii = 1:numtest
     
     BT_params.targetType =  'level';
     % BT_params.target =  [0.0 inf];
-    BT_params.target =  [0.002 0.004];
+    BT_params.target =  [0.01 0.02];
     
     BT_params.targetName = ['Risk']; % ['ExpectedReturn']; % 
     BT_params.FixRebalThreshold = Inf; %0.10; % size of the outbalance for a single asset to be considered for the purpose of rebalancing
@@ -141,6 +159,8 @@ elseif strcmp(BT_params.targetType,'quantile')
 end
 
 clear outputs;
+import OutputsMgmt.*;
+
 outputs = AA_Outputs(Universe_1,BT_params,['Dynamic_AA_1']);
 outputs.GetAllocationsHistory;
 outputs.GetReturnAndRiskMetrics(10);

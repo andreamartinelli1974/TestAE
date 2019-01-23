@@ -379,12 +379,13 @@ classdef EVT_CopulaSim < handle
         end % OptimizeTailsCutoffs
         
         
-        function FitCopulaAndSimulate(EVT)
+        function FitCopulaAndSimulate(EVT) % GP change
             
             Y = EVT.X;
             ProbThreshold4MC = EVT.inputParams.ProbThreshold4MC;
             OBJ = EVT.parametrizedDistributions; % estimated parametric ot sempiparametric marginals
             corr_X = EVT.inputParams.corr_X;
+            
             nsim = EVT.inputParams.nsim;
             
             U = zeros(size(Y)); % preallocation
@@ -503,10 +504,16 @@ classdef EVT_CopulaSim < handle
             
         end % FitCopulaAndSimulate
         
-        function  Simulate(EVT)
+        function  simulation = Simulate(EVT,nsim) % GP
+            % GP: need to model the tcoupla case as well
+            
             % to run a new simulation after all parameters have been
             % estimated (TO BE WRITTEN)
-            
+            if strcmp(EVT.copulaType,'Gaussian-copula')
+                simulation = copularnd('gaussian',EVT.CopulaParams.RHO,nsim);
+            elseif strcmp(EVT.copulaType,'T-copula')
+                simulation = copularnd('t',EVT.CopulaParams.RHO,floor(EVT.CopulaParams.Dof)+1,nsim);
+            end
         end
         
     end % public methods

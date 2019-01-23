@@ -132,13 +132,13 @@ classdef ThreeLayerNet < handle
             %%%%%% op_type: 'encode' or 'decode'
             timeDelays = Obj.DeeperNet.layerWeights{3,2}.delays;
             
-            if Obj.InputParams.SquareRet && strcmp(op_type,'encode')
-                % in case we are interested in vola dependencies and autoregression
-                % must be used only in the 'encode' input
-                tmp = InputX(1:Obj.InputParams.N_myFactors,:);
-                sqR = tmp.^2;
-                InputX = [InputX(1:Obj.InputParams.N_myFactors,:); sqR; InputX(Obj.InputParams.N_myFactors+1:end,:)];
-            end
+%             if Obj.InputParams.SquareRet && strcmp(op_type,'encode')
+%                 % in case we are interested in vola dependencies and autoregression
+%                 % must be used only in the 'encode' input
+%                 tmp = InputX(1:Obj.InputParams.N_myFactors,:);
+%                 sqR = tmp.^2;
+%                 InputX = [InputX(1:Obj.InputParams.N_myFactors,:); sqR; InputX(Obj.InputParams.N_myFactors+1:end,:)];
+%             end
             
             % Format Input Arguments
             if ~iscell(InputX)
@@ -257,13 +257,151 @@ classdef ThreeLayerNet < handle
             
         end %EncDecFunction
         
+        
+        function [output,Xf,Af] = EncDecFunctionVectorized(Obj,InputX,op_type)
+            
+            % this is a modified version of the function generated automatically by Matlab through
+            % genFunction(net1,'testF'). It has been modified to parametrize some data
+            % that are defined as constants in the Matlab version.
+            
+            %%%%%% INPUTS :
+            %%%%%% InputX = n x t double array with the series of invariants
+            %%%%%%     to be encoded/decoded (n series x t timesteps)
+            %%%%%% op_type: 'encode' or 'decode'
+            timeDelays = Obj.DeeperNet.layerWeights{3,2}.delays;
+            
+%             if Obj.InputParams.SquareRet && strcmp(op_type,'encode')
+%                 % in case we are interested in vola dependencies and autoregression
+%                 % must be used only in the 'encode' input
+%                 tmp = InputX(1:Obj.InputParams.N_myFactors,:);
+%                 sqR = tmp.^2;
+%                 InputX = [InputX(1:Obj.InputParams.N_myFactors,:); sqR; InputX(Obj.InputParams.N_myFactors+1:end,:)];
+%             end
+            
+            % Format Input Arguments
+            if ~iscell(InputX)
+                XX = Obj.matrixTs2CellTs(InputX);
+            else
+                XX = InputX;
+            end
+            
+            [X,Xi,Ai] = preparets(Obj.DeeperNet,XX); % This function simplifies the task of
+            % reformatting input and target time series.
+            % It automatically shifts time series
+            % to fill the initial input and layer delay states.
+            
+            % Dimensions
+            TS = size(X,2); % timesteps
+            if ~isempty(X)
+                Q = size(X{1},2); % samples/series
+            elseif ~isempty(Xi)
+                Q = size(Xi{1},2);
+            else
+                Q = 0;
+            end
+            
+            % encoder bias and weights
+            bias_1 = Obj.DeeperNet.b{1};
+            IW_1_1 = Obj.DeeperNet.IW{1,1};
+            % decoder bias and weights
+            bias_2 = Obj.DeeperNet.b{2};
+            LW_2_1 =  Obj.DeeperNet.LW{2,1};
+            bias_3 = Obj.DeeperNet.b{3};
+            LW_3_2 =  Obj.DeeperNet.LW{3,2};
+            
+            % Layer Delay States
+            Ad1 = [Ai(1,:) cell(1,1)];
+            Ad2 = [Ai(2,:) cell(1,1)];
+            Ad3 = [Ai(3,:) cell(1,1)];
+            
+            highestDelay = timeDelays(end);
+            
+            % Allocate Outputs
+            output = cell(1,TS);
+            
+            % Time loop
+            for ts=1:TS
+                
+                if strcmp(op_type,'encode') % when used for encoding    
+                    
+                    % Layer 1 of netObj.encoder
+                    if strcmp(Obj.DeeperNet.layers{1}.transferFcn,'radbas')
+                        output{1,ts} = radbas_apply(repmat(bias_1,1,Q) + IW_1_1*X{1,ts});
+                    elseif strcmp(Obj.DeeperNet.layers{1}.transferFcn,'logsig')
+                        output{1,ts} = logsig_apply(repmat(bias_1,1,Q) + IW_1_1*X{1,ts});
+                    elseif strcmp(Obj.DeeperNet.layers{1}.transferFcn,'tansig')
+                        output{1,ts} = tansig_apply(repmat(bias_1,1,Q) + IW_1_1*X{1,ts});
+                    end
+                    
+                elseif strcmp(op_type,'decode') % when using for decoding
+                    
+                    % Rotating delay state position
+                    adts = mod(ts+highestDelay-1,highestDelay+1)+1;
+                    
+                    % Layer 2
+                    Ad1{adts} = X{1,ts};
+                    tapdelay1 = cat(1,Ad1{mod(adts-0-1,highestDelay+1)+1});
+                    Ad2{adts} = repmat(bias_2,1,Q) + LW_2_1*tapdelay1;
+                    
+                    % Layer 3
+                    tapdelay2 = cat(1,Ad2{mod(adts-timeDelays-1,highestDelay+1)+1});
+                    Ad3{adts} = repmat(bias_3,1,Q) + LW_3_2*tapdelay2;
+                    
+                    % Output 1
+                    output{1,ts} = Ad3{adts};
+                    
+                end
+            end % time loop
+            
+            % Final Delay States
+            finalats = TS+(1: highestDelay);
+            ats = mod(finalats-1,highestDelay+1)+1;
+            Xf = cell(1,0);
+            Af = cell(3,highestDelay);
+            Af(1,:) = Ad1(:,ats);
+            Af(2,:) = Ad2(:,ats);
+            Af(3,:) = Ad3(:,ats);
+
+            % Format Output Arguments
+            output = cell2mat(output);
+            
+            % check for autocorrelation in features using lbqtest
+            if strcmp(op_type,'encode') % when used for encoding
+                nrFeature = size(output,1);
+                Obj.AutoCorrFlag = zeros(nrFeature,8);
+                Obj.HeteroscedFlag = zeros(nrFeature,8);
+                for j = 1:nrFeature
+                    [h,pValue,stat,cValue] = lbqtest(output(j,:),'lags',[1,2]);
+                    Obj.AutoCorrFlag(j,:) = [h,pValue,stat,cValue];
+                    [h,pValue,stat,cValue] = lbqtest(output(j,:).^2,'lags',[1,2]);
+                    Obj.HeteroscedFlag(j,:) = [h,pValue,stat,cValue];
+                end
+            end
+            
+            %%% USEFUL FUNCTION
+            
+            % Radial Basis Transfer Function
+            function a = radbas_apply(n,~)
+                a = exp(-(n.*n));
+            end
+            % Log-Sigmoid Transfer Function
+            function a = logsig_apply(n,~)
+                a = 1 ./ (1 + exp(-n));
+            end
+            % Sigmoid Symmetric Transfer Function
+            function a = tansig_apply(n,~)
+                a = 2 ./ (1 + exp(-2*n)) - 1;
+            end
+            
+        end %EncDecFunctionVectorized
+        
     end % methods
     
        
     methods (Static)
         
         function XX = matrixTs2CellTs(X)
-                  % the loop below is based on the time dimension and for each time put in a
+            % the loop below is based on the time dimension and for each time put in a
             % cell of a cell array the sample point for that time, where the sample
             % point has dimension numOfTS.
             % Basically can look at it as a timeseries of multidimensional datapoints
