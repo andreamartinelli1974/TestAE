@@ -559,6 +559,13 @@ while t<L
             else
                 TrainingSet = X;
                 
+                if DAA_params.UseSpotCheck == 1
+                    AutoEncoder.parametersSpotCheck(TrainingSet);
+                    AutoEncoder.SetNet(TrainingSet);
+                    DAA_params.UseSpotCheck = 0;
+                end
+                
+    
                 AutoEncoder.TrainAE(TrainingSet'); % GP
                 % input must be scaled up by the
                 % 'AEparams.multFactor4NumericalStability' factor, since
@@ -628,8 +635,23 @@ while t<L
                 
             end
             
-            debug_OUT.EVT = EVT.OUT;
+% %             for s=1:nsim
+% %                 X_simulated(:,:,s) = (EVT.Simulate(HorizonDays + maxDelay))';
+% %             end
+% %             decodedData = AutoEncoder.EncDecFunction(X_simulated,'decode')';
             
+            % GP: commented
+            
+            %                         if DAA_params.UseAutoEncoder == true && DAA_params.AEparams.ScaleData == true
+            %                             % centered already in this case
+            %                             % don't need to add back the mean (see IF statement above)
+            %                         else
+            %                             X_simulated = bsxfun(@plus, X_simulated, mu_X); % new simulated 'X'
+            %                         end
+            
+            % ***************
+            % GP: ned to adapt this
+            debug_OUT.EVT = EVT.OUT;
             if ~DAA_params.UseAutoEncoder % GP temp (*** temporarily excluded ***): need to adapt this
                 %                         for corrdim = 1:size(X_centered,2)
                 %                             Y(Y >= DAA_params.simbound *max(X_centered(:,corrdim))) = DAA_params.simbound * max(X_centered(:,corrdim));
@@ -899,13 +921,32 @@ while t<L
             % Entropy Pooling
             
             if usingArmagarch | DAA_params.UseAutoEncoder % GP
-                % omit:  WE DO NOT PROJECT AS THE PROJECTION IS DONE
-                % EARLIER USING ARMA GARCH OR AUTOENCODER
+                % omit:  WE DO NOT PROJECT AS THE PROJECTION IS DONE EARLIER USING ARMA GARCH.
             elseif ~usingArmagarch & ~DAA_params.UseAutoEncoder
                 [X_Resampled] = ...
                     U.ResampleInvariants(X_simulated,DAA_params.ProjectionResampling_numsim,HorizonDays,'bootstrap');
                 X_Projected = sum(X_Resampled,3);
             end
+            
+            % GP changes
+            %                         if DAA_params.UseAutoEncoder == true && DAA_params.AEafterResampling
+            %                             tic
+            %
+            %                             [tt,invariantsNo] = size(X);
+            %                             X_res_final = zeros(DAA_params.ProjectionResampling_numsim,invariantsNo,HorizonDays);
+            %                             maxDelay = AutoEncoder.InputParams.Delays(end);
+            %
+            %                             for i = 1:size(X_Resampled,3)
+            %                                 decodedData = AutoEncoder.EncDecFunction(X_Resampled(:,:,i)','decode')';
+            %                                 decodedData = decodedData(:,1:invariantsNo);
+            %                                 X_res_final(maxDelay+1:end,:,i) = decodedData;
+            %                             end
+            %
+            %                             X_Resampled = X_res_final;
+            %                             X_Projected = sum(X_Resampled,3);
+            %
+            %                             toc
+            %                         end
             
             J = size(X_Projected,1); % no of joint historical scenarios
             p = ones(J,1)/J; % probability of each joint scenario

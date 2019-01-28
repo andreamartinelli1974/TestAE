@@ -87,6 +87,7 @@ for ii = 1:numtest
     DAA_params.ARMAGARCH = 0;
     DAA_params.Priori_MovWin = 1000;
     DAA_params.MinFreqOfProrUpdate = 20;   
+    DAA_params.UseSpotCheck = false;
     
     DAA_params.copula_NoSim = 10000;
     DAA_params.ProjectionResampling_numsim = 9900;
