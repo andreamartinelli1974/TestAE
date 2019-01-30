@@ -614,18 +614,18 @@ while t<L
                     X_simulated = bsxfun(@plus, X_simulated, mu_X);
                 end
                 [~,invariantsNo] = size(X);
-                [n1,HiddenSize] = size(X_simulated);
+                [n1,~] = size(X_simulated);
                 maxDelay = AutoEncoder.InputParams.Delays(end);
                 nsim = DAA_params.ProjectionResampling_numsim;
                 X_Resampled = zeros(nsim,invariantsNo,HorizonDays);
                 X_Projected = zeros(nsim,invariantsNo);
                 path = HorizonDays + maxDelay;
                 
-                extracted_occurrences = unidrnd(n1,nsim*path,HiddenSize);
+                extracted_occurrences = unidrnd(n1,nsim*path,DAA_params.AEparams.HiddenSize);
                 for count_t=1:path
                     Y_all(:,count_t,:) = X_simulated(extracted_occurrences((count_t*nsim-nsim+1):count_t*nsim,:));
                 end
-                testPF = tic;
+                testPF = tic
                 if  DAA_params.AEparams.OneStep
                     parfor s=1:nsim
                         X_simulated_onepath =  squeeze(Y_all(s,:,:));

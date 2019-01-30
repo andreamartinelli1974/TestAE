@@ -38,7 +38,7 @@ classdef AutoEncoder_DR < handle
     % parameter = 1000, than all data in the dataset are multiplied * 1000)
     
     properties (Constant)
-        SeeNNtraining =  true(1); % false(1); %  to see or not to see the nntraintool
+        SeeNNtraining =   false(1); % true(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)
@@ -111,9 +111,14 @@ classdef AutoEncoder_DR < handle
                 AE.NormMetrics.std_X4AE_targets = AE.NormMetrics.std_X4AE(1:AE.InputParams.N_myFactors);
             end
             
-                        
-            AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability);
-            AE.Targets = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns    
+            if AE.InputParams.OneStep
+                Step = AE.InputParams.HorizonDays;
+                AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet(:,1:end - Step).*AE.InputParams.multFactor4NumericalStability);
+                AE.Targets = AE.matrixTs2CellTs(normTrainingSet(:,Step+1:end).*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns    
+            else
+                AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability);
+                AE.Targets = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns    
+            end
             
             [Xs,Xi,Ai] = preparets(AE.Net.DeeperNet,AE.TrainingSet);
             
@@ -171,57 +176,6 @@ classdef AutoEncoder_DR < handle
             AE.OptimalParameters = 0;   
 
         end % AutoEncoder_DR
-        
-        function SetNet(AE,TrainingSet)
-            
-            disp('training the final net');
-            
-            if ~isempty(TrainingSet)
-                if AE.InputParams.SquareRet % in case we are interested in vola dependencies and autoregression
-                    tmp = TrainingSet(1:AE.InputParams.N_myFactors,:);
-                    sqR = tmp.^2;
-                    TrainingSet = [TrainingSet(1:AE.InputParams.N_myFactors,:); sqR; TrainingSet(AE.InputParams.N_myFactors+1:end,:)];
-                    Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
-                    TsqR = Target.^2;
-                    Target = [Target; TsqR];
-                else
-                    Target = TrainingSet(1:AE.InputParams.N_myFactors,:);
-                end
-                AE.TrainingSet = AE.matrixTs2CellTs(TrainingSet.*AE.InputParams.multFactor4NumericalStability);
-                AE.Targets = AE.matrixTs2CellTs(Target.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets
-            end
-            
-            % initializes the weights matrices, while building net1
-            % from net
-            AE.Net.DeeperNet = configure(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets);
-            
-            AE.Net.DeeperNet.trainParam.epochs = 100;
-            AE.Net.DeeperNet.trainParam.max_fail = 50;
-            AE.Net.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
-            AE.Net.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
-                                     'plotregression', 'plotfit'};
-            
-            if strcmp(AE.Net.DeeperNet.performFcn,'msesparse') % WHEN USING 'msesparse' Loss Function
-                % set the parameters for the current loop
-                AE.Net.DeeperNet.performParam.sparsityRegularization =  AE.OptimalParameters(1);
-                AE.Net.DeeperNet.performParam.sparsity =  AE.OptimalParameters(2);
-                AE.Net.DeeperNet.performParam.L2WeightRegularization =  AE.OptimalParameters(3); 
-            elseif strcmp(AE.Net.DeeperNet.performFcn,'mse') || strcmp(AE.Net.DeeperNet.performFcn,'sse') % WHEN USING 'mse' Loss Function
-                % set the parameters for the current loop
-                AE.Net.DeeperNet.performParam.regularization = AE.OptimalParameters;
-            end
-            
-            % ****  TRAIN *****
-            [Xs,Xi,Ai] = preparets(AE.Net.DeeperNet,AE.TrainingSet);
-            [AE.Net.DeeperNet,tr] = train(AE.Net.DeeperNet,AE.TrainingSet,AE.Targets,Xi,Ai);%,'useParallel','yes','reduction',2);
-            
-            AE.OUT4Debug.SetNet.tr = tr;
-            
-            if AE.SeeNNtraining == true
-                nntraintool('close')
-            end
-            
-        end % SetNet
         
         function [output,Xf,Af] = EncDecFunction(AE,InputX,op_type)
             

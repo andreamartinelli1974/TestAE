@@ -48,9 +48,14 @@ numtest = 2; % GP <===============
 
 for ii = 1:numtest
     
-    DAA_params.AEafterResampling = true(1);
+    if ii == 1
+        AEparams.OneStep = true(1);
+        AEparams.HorizonDays = DAA_params.HorizonDays;
+    else
+        AEparams.OneStep = false(1);
+    end
     
-    AEparams.HiddenSize = 50+50*ii;
+    AEparams.HiddenSize = 100;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'tansig'; % 'tansig'; % 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
