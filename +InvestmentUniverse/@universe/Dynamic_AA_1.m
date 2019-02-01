@@ -607,9 +607,6 @@ while t<L
                 X_simulated = bsxfun(@plus, X_simulated, mu_X); % new simulated 'X'
                 
             elseif DAA_params.UseAutoEncoder
-                if  DAA_params.AEparams.OneStep
-                    HorizonDays = 1;
-                end
                 if ~DAA_params.AEparams.ScaleData
                     X_simulated = bsxfun(@plus, X_simulated, mu_X);
                 end
@@ -626,24 +623,16 @@ while t<L
                     Y_all(:,count_t,:) = X_simulated(extracted_occurrences((count_t*nsim-nsim+1):count_t*nsim,:));
                 end
                 testPF = tic;
-                if  DAA_params.AEparams.OneStep
-                    parfor s=1:nsim
-                        X_simulated_onepath =  squeeze(Y_all(s,:,:));
-                        decodedData = AutoEncoder.EncDecFunction(X_simulated_onepath','decode')';
-                        decodedData = decodedData(:,1:invariantsNo);
-                        X_Projected(s,:) = decodedData'; %./AEparams.multFactor4NumericalStability;
-                    end
-                    X_Resampled(:,:,1) = X_Projected;
-                else
-                    parfor s=1:nsim
-                        X_simulated_onepath =  squeeze(Y_all(s,:,:));
-                        decodedData = AutoEncoder.EncDecFunction(X_simulated_onepath','decode')';
-                        decodedData = decodedData(:,1:invariantsNo);
-                        X_Resampled(s,:,:) = decodedData'; %./AEparams.multFactor4NumericalStability;
-                    end
-                    X_Projected = sum(X_Resampled,3);
+                
+                parfor s=1:nsim
+                    X_simulated_onepath =  squeeze(Y_all(s,:,:));
+                    decodedData = AutoEncoder.EncDecFunction(X_simulated_onepath','decode')';
+                    decodedData = decodedData(:,1:invariantsNo);
+                    X_Resampled(s,:,:) = decodedData'; %./AEparams.multFactor4NumericalStability;
                 end
-                parfortime = toc(testPF)
+                X_Projected = sum(X_Resampled,3);
+                
+                parfortime = toc(testPF)git
             end
             
             debug_OUT.EVT = EVT.OUT;

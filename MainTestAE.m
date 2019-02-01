@@ -48,14 +48,7 @@ numtest = 2; % GP <===============
 
 for ii = 1:numtest
     
-    if ii == 1
-        AEparams.OneStep = true(1);
-        AEparams.HorizonDays = DAA_params.HorizonDays;
-    else
-        AEparams.OneStep = false(1);
-    end
-    
-    AEparams.HiddenSize = 100;
+    AEparams.HiddenSize = 40+30*i;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'tansig'; % 'tansig'; % 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
@@ -72,6 +65,7 @@ for ii = 1:numtest
     % v.trainFcn = 'trainscg'; % use with msesparse
     AEparams.SquareRet =  true(1); % false(1); %  use also the suared returns in input to catch vola autoreg
     AEparams.multFactor4NumericalStability = 1; % multiplicative factor used for numerical stability
+    
     
     DAA_params.AEparams = AEparams;
     

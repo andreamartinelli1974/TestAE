@@ -111,14 +111,8 @@ classdef AutoEncoder_DR < handle
                 AE.NormMetrics.std_X4AE_targets = AE.NormMetrics.std_X4AE(1:AE.InputParams.N_myFactors);
             end
             
-            if AE.InputParams.OneStep
-                Step = AE.InputParams.HorizonDays;
-                AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet(:,1:end - Step).*AE.InputParams.multFactor4NumericalStability);
-                AE.Targets = AE.matrixTs2CellTs(normTrainingSet(:,Step+1:end).*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns    
-            else
-                AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability);
-                AE.Targets = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns    
-            end
+            AE.TrainingSet = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability);
+            AE.Targets = AE.matrixTs2CellTs(normTrainingSet.*AE.InputParams.multFactor4NumericalStability); % I want only the initial N_myFactors as targets and eventually the squared returns
             
             [Xs,Xi,Ai] = preparets(AE.Net.DeeperNet,AE.TrainingSet);
             
