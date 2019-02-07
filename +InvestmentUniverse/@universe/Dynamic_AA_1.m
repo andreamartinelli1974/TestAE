@@ -186,7 +186,7 @@ while isempty(fd) | ~precondition
     
     fd = find(U.AllInvariants.Dates(:,1) == startday_n);
     if ~isempty(fd)
-        precondition = (fd - max(DAA_params.Priori_IntialLookback,DAA_params.Priori_MovWin) > 0);
+        precondition = (fd - max(DAA_params.Priori_IntialLookback,DAA_params.Priori_MovWin+1) > 0);
     end
     cn = cn + 1;
     if startday_n > U.AllInvariants.Dates(end)
@@ -380,7 +380,7 @@ while t<L
         
         mc = metaclass(U.Assets(na).value);
         objtype = mc.Name;
-        
+        try
         if (~isempty(U.Assets(na).value.Enter_Universe_date) && current_t_date<datenum(U.Assets(na).value.Enter_Universe_date)) ... not yet in the Universe
                 | ((~isempty(U.Assets(na).value.AA_limits.lb) &  ~isempty(U.Assets(na).value.AA_limits.ub)) && AA_constraints.lb(na)==0 &  AA_constraints.ub(na)==0 ) ... %U.Assets(na).value.AA_limits.lb == 0 & U.Assets(na).value.AA_limits.ub == 0) ... % has zero weight
                 | (strcmp(objtype,'bond_ZCB') && ~isempty(U.Assets(na).value.MaturityDate) && current_t_date > datenum(U.Assets(na).value.MaturityDate)) ... % it is a bond and it is expired
@@ -388,7 +388,9 @@ while t<L
                 | (strcmp(objtype,'Option_Vanilla') && ~isempty(U.Assets(na).value.ExpiryDate) && current_t_date > datenum(U.Assets(na).value.ExpiryDate))
             Active_Assets(t,na) = 0; % this can be modified later by quant signals
         end
-        
+        catch AM
+            pause
+        end
         % retrieving the multiplier
         Multipliers(t,na) =  U.Assets(na).value.Multiplier;
     end
@@ -632,7 +634,7 @@ while t<L
                 end
                 X_Projected = sum(X_Resampled,3);
                 
-                parfortime = toc(testPF)git
+                parfortime = toc(testPF)
             end
             
             debug_OUT.EVT = EVT.OUT;

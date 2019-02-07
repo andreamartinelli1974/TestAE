@@ -18,9 +18,9 @@ datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 % datapath = 'D:\encoderData\'; %  
 
 import InvestmentUniverse.*;
-load([datapath,'DAA_paramsEquity'])
-DAA_params.StartDay = '6/2/2017';
-load([datapath,'UniverseEquity']);
+load([datapath,'DAA_paramsDVA'])
+DAA_params.StartDay = '2/2/2017';
+load([datapath,'UniverseDVA']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);
 
@@ -44,11 +44,11 @@ else
     end
 end
 
-numtest = 2; % GP <===============
+numtest = 3; % GP <===============
 
 for ii = 1:numtest
     
-    AEparams.HiddenSize = 40+30*i;
+    AEparams.HiddenSize = 15+8*ii;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'tansig'; % 'tansig'; % 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
@@ -84,7 +84,7 @@ for ii = 1:numtest
     
     
     DAA_params.ARMAGARCH = 0;
-    DAA_params.Priori_MovWin = 1000;
+    DAA_params.Priori_MovWin = 300;
     DAA_params.MinFreqOfProrUpdate = 20;   
     
     DAA_params.copula_NoSim = 10000;
