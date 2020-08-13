@@ -18,9 +18,9 @@ datapath = 'C:\Program Files\MATLAB\R2018a\work\IMI\AutoEncoderData\';
 % datapath = 'D:\encoderData\'; %  
 
 import InvestmentUniverse.*;
-load([datapath,'DAA_paramsDVA'])
+load([datapath,'DAA_paramsEquity'])
 DAA_params.StartDay = '2/2/2017';
-load([datapath,'UniverseDVA']);
+load([datapath,'UniverseEquity']);
 AssetLegend = Universe_1.AllInvariants.NamesSet;
 save([datapath,'AssetLegend',datestr(date,'yyyymmdd')]);
 
@@ -44,15 +44,16 @@ else
     end
 end
 
-numtest = 3; % GP <===============
+numtest = 6; % GP <===============
 
 for ii = 1:numtest
     
-    AEparams.HiddenSize = 15+8*ii;
+    AEparams.HiddenSize = 94+32*ii;
     AEparams.N_myFactors = numel(AssetLegend); % number of real factors to be modelled (must be the first n of the data set)
     AEparams.EncoderTransferFunction = 'tansig'; % 'tansig'; % 'logsig'; %  'radbas'; %
     AEparams.DecoderTransferFunction = 'purelin';
     AEparams.MaxEpoch = 2500;
+    AEparams.MaxFail = 10;
     AEparams.ScaleData = false; % true;
     AEparams.divideFcn = 'divideblock'; % 'dividerand'; % Divide data randomly
     AEparams.divideMode = 'time'; % 'sample';
@@ -69,22 +70,8 @@ for ii = 1:numtest
     
     DAA_params.AEparams = AEparams;
     
-%     N = DAA_params.Priori_MovWin = 1000;
-%     stripLen = 20;
-%     done = false;
-%     while ~done
-%         trainTmp = unidrnd(N,1);
-%         train_ind = 
-%         
-%         valTmp = unidrnd(N-stripLen,1);
-%         testTmp = unidrnd(N,1);
-%         
-%         
-%     end
-    
-    
     DAA_params.ARMAGARCH = 0;
-    DAA_params.Priori_MovWin = 300;
+    DAA_params.Priori_MovWin = 1000;
     DAA_params.MinFreqOfProrUpdate = 20;   
     
     DAA_params.copula_NoSim = 10000;

@@ -8,7 +8,7 @@ classdef ThreeLayerNet < handle
     % encoder/decoder function
     
     properties (Constant)
-        SeeNNtraining = true(1); % false(1); % to see or not to see the nntraintool
+        SeeNNtraining =  false(1); % true(1); % to see or not to see the nntraintool
     end
     
     properties (SetAccess = immutable)

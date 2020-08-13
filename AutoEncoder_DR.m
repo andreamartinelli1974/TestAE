@@ -49,8 +49,6 @@ classdef AutoEncoder_DR < handle
        Net = []; % this is the object used to build the net and the encoder/decoder functions
        TrainingSet = []; % set of data to train the AutoEncoder
        Targets = []; % set of data targets (could be different from the number of trainig set invariants)
-       OptimalParameters = []; % Optimal parameters for thr net to be found with a spot check test
-       OptimalPerformance = []; % performance of the net with optimal parameters from spot check test
        OUT4Debug = []; % for debugging and fine tuning purposes
        PreviousRunWeights = []; % used to store the set of optimal weights (see notes below)
        NormMetrics = []; % struct to host mean and std used to normalize data and then recats them into the original space
@@ -119,7 +117,7 @@ classdef AutoEncoder_DR < handle
             AE.Net.DeeperNet.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
                                      'plotregression', 'plotfit'};
             AE.Net.DeeperNet.trainParam.epochs = AE.InputParams.MaxEpoch;
-            AE.Net.DeeperNet.trainParam.max_fail = 10;
+            AE.Net.DeeperNet.trainParam.max_fail = AE.InputParams.MaxFail;
             AE.Net.DeeperNet.trainParam.showWindow = AE.SeeNNtraining;
             
 
@@ -137,12 +135,14 @@ classdef AutoEncoder_DR < handle
                 AE.Net.DeeperNet.LW = AE.PreviousRunWeights.LW;
                 AE.Net.DeeperNet.b = AE.PreviousRunWeights.b;
             end
-            AE.Net.DeeperNet.trainParam.delt_inc = 1.2;
-            AE.Net.DeeperNet.trainParam.delt_dec = 0.5;
-            AE.Net.DeeperNet.trainParam.min_grad = 1e-6;
-            AE.Net.DeeperNet.trainParam.delta0 = 1e-4;
-            AE.Net.DeeperNet.trainParam.deltamax = 10;
-            AE.Net.DeeperNet.trainParam.goal = 0;
+            if strcmp(AE.InputParams.trainFcn,'trainrp')
+                AE.Net.DeeperNet.trainParam.delt_inc = 1.2;
+                AE.Net.DeeperNet.trainParam.delt_dec = 0.5;
+                AE.Net.DeeperNet.trainParam.min_grad = 1e-6;
+                AE.Net.DeeperNet.trainParam.delta0 = 1e-4;
+                AE.Net.DeeperNet.trainParam.deltamax = 10;
+                AE.Net.DeeperNet.trainParam.goal = 0;
+            end
             
             % train in 2 steps: 1st standardizing the errors to have the
             % first attempt, 2nd without this standardisation to refine the
@@ -165,9 +165,6 @@ classdef AutoEncoder_DR < handle
                 nntraintool('close')
             end
             
-            % if no spot check has to take place these values will be kept                     
-            AE.OptimalPerformance = NaN;
-            AE.OptimalParameters = 0;   
 
         end % AutoEncoder_DR
         
